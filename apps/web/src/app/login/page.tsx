@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -15,31 +15,85 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // Page load logging
+  useEffect(() => {
+    console.log("[LOGIN PAGE] 🔐 Page mounted");
+    console.log("[LOGIN PAGE] Supabase client initialized");
+    return () => {
+      console.log("[LOGIN PAGE] 🔐 Page unmounted");
+    };
+  }, []);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    console.log("[LOGIN] 🚀 Login form submitted");
+    console.log("[LOGIN] Email:", email);
+    console.log("[LOGIN] Password length:", password.length);
+    
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log("[LOGIN] ⏳ Calling Supabase signInWithPassword...");
+    const startTime = Date.now();
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    const duration = Date.now() - startTime;
+    console.log("[LOGIN] ⏱️ Auth request took:", duration, "ms");
+
     if (error) {
+      console.error("[LOGIN] ❌ Login failed:", error.message);
+      console.error("[LOGIN] Error details:", error);
       setError(error.message);
       setLoading(false);
       return;
     }
 
+    console.log("[LOGIN] ✅ Login successful!");
+    console.log("[LOGIN] User ID:", data.user?.id);
+    console.log("[LOGIN] User email:", data.user?.email);
+    console.log("[LOGIN] Session expires:", data.session?.expires_at);
+    console.log("[LOGIN] 🔄 Redirecting to /app...");
+    
     router.push("/app");
     router.refresh();
+  }
+
+  function handleEmailChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[LOGIN] 📝 Email input changed");
+    setEmail(e.target.value);
+  }
+
+  function handlePasswordChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[LOGIN] 📝 Password input changed, length:", e.target.value.length);
+    setPassword(e.target.value);
+  }
+
+  function handleTogglePassword() {
+    console.log("[LOGIN] 👁️ Password visibility toggled:", !showPassword ? "visible" : "hidden");
+    setShowPassword(!showPassword);
+  }
+
+  function handleForgotPasswordClick() {
+    console.log("[LOGIN] 🔗 Forgot password link clicked");
+  }
+
+  function handleSignupClick() {
+    console.log("[LOGIN] 🔗 Sign up link clicked");
+  }
+
+  function handleLogoClick() {
+    console.log("[LOGIN] 🔗 Logo clicked, navigating to home");
   }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
+          <Link href="/" onClick={handleLogoClick} className="inline-flex items-center gap-2 mb-6">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
               <span className="text-2xl font-bold">B</span>
             </div>
@@ -64,7 +118,7 @@ export default function LoginPage() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               required
               className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition"
               placeholder="you@example.com"
@@ -80,14 +134,14 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
                 required
                 className="w-full px-4 py-3 pr-12 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
                 placeholder="••••••••"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={handleTogglePassword}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -97,7 +151,7 @@ export default function LoginPage() {
           </div>
 
           <div className="flex justify-end">
-            <Link href="/forgot-password" className="text-sm text-gray-400 hover:text-white">
+            <Link href="/forgot-password" onClick={handleForgotPasswordClick} className="text-sm text-gray-400 hover:text-white">
               Forgot password?
             </Link>
           </div>
@@ -120,7 +174,7 @@ export default function LoginPage() {
 
         <p className="text-center text-gray-400 mt-6">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/signup" onClick={handleSignupClick} className="text-indigo-400 hover:text-indigo-300">
             Sign up
           </Link>
         </p>

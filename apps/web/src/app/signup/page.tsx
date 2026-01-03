@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -16,12 +16,25 @@ export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  useEffect(() => {
+    console.log("[SIGNUP PAGE] 📝 Page mounted");
+    console.log("[SIGNUP PAGE] Supabase client initialized");
+    return () => console.log("[SIGNUP PAGE] 📝 Page unmounted");
+  }, []);
+
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
+    console.log("[SIGNUP] 🚀 Signup form submitted");
+    console.log("[SIGNUP] Email:", email);
+    console.log("[SIGNUP] Password length:", password.length);
+    
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    console.log("[SIGNUP] ⏳ Calling Supabase signUp...");
+    const startTime = Date.now();
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -29,14 +42,43 @@ export default function SignupPage() {
       },
     });
 
+    const duration = Date.now() - startTime;
+    console.log("[SIGNUP] ⏱️ Signup request took:", duration, "ms");
+
     if (error) {
+      console.error("[SIGNUP] ❌ Signup failed:", error.message);
+      console.error("[SIGNUP] Error details:", error);
       setError(error.message);
       setLoading(false);
       return;
     }
 
+    console.log("[SIGNUP] ✅ Signup successful!");
+    console.log("[SIGNUP] User ID:", data.user?.id);
+    console.log("[SIGNUP] User email:", data.user?.email);
+    console.log("[SIGNUP] 📧 Confirmation email sent");
+    
     setSuccess(true);
     setLoading(false);
+  }
+
+  function handleEmailChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[SIGNUP] 📝 Email input changed");
+    setEmail(e.target.value);
+  }
+
+  function handlePasswordChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[SIGNUP] 📝 Password input changed, length:", e.target.value.length);
+    setPassword(e.target.value);
+  }
+
+  function handleTogglePassword() {
+    console.log("[SIGNUP] 👁️ Password visibility toggled:", !showPassword ? "visible" : "hidden");
+    setShowPassword(!showPassword);
+  }
+
+  function handleLinkClick(linkName: string) {
+    console.log(`[SIGNUP] 🔗 ${linkName} link clicked`);
   }
 
   if (success) {
@@ -91,7 +133,7 @@ export default function SignupPage() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               required
               className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition"
               placeholder="you@example.com"
@@ -107,7 +149,7 @@ export default function SignupPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
                 required
                 minLength={6}
                 className="w-full px-4 py-3 pr-12 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
@@ -115,7 +157,7 @@ export default function SignupPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={handleTogglePassword}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >

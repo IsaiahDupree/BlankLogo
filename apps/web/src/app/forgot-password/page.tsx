@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Mail } from "lucide-react";
 
@@ -10,10 +10,21 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    console.log("[FORGOT PASSWORD PAGE] 🔑 Page mounted");
+    return () => console.log("[FORGOT PASSWORD PAGE] 🔑 Page unmounted");
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    console.log("[FORGOT PASSWORD] 🚀 Form submitted");
+    console.log("[FORGOT PASSWORD] Email:", email);
+    
     setLoading(true);
     setError(null);
+
+    console.log("[FORGOT PASSWORD] ⏳ Sending reset request...");
+    const startTime = Date.now();
 
     try {
       const res = await fetch("/api/auth/forgot-password", {
@@ -22,20 +33,36 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
 
+      const duration = Date.now() - startTime;
+      console.log("[FORGOT PASSWORD] ⏱️ Request took:", duration, "ms");
+
       const data = await res.json();
+      console.log("[FORGOT PASSWORD] Response status:", res.status);
 
       if (!res.ok) {
+        console.error("[FORGOT PASSWORD] ❌ Error:", data.error);
         setError(data.error || "Something went wrong");
         setLoading(false);
         return;
       }
 
+      console.log("[FORGOT PASSWORD] ✅ Reset email sent successfully");
       setSent(true);
-    } catch {
+    } catch (err) {
+      console.error("[FORGOT PASSWORD] ❌ Network error:", err);
       setError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleEmailChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[FORGOT PASSWORD] 📝 Email input changed");
+    setEmail(e.target.value);
+  }
+
+  function handleLinkClick(linkName: string) {
+    console.log(`[FORGOT PASSWORD] 🔗 ${linkName} clicked`);
   }
 
   if (sent) {
@@ -90,7 +117,7 @@ export default function ForgotPasswordPage() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               required
               className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
               placeholder="you@example.com"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
@@ -15,22 +15,37 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  useEffect(() => {
+    console.log("[RESET PASSWORD PAGE] 🔐 Page mounted");
+    console.log("[RESET PASSWORD PAGE] URL:", window.location.href);
+    return () => console.log("[RESET PASSWORD PAGE] 🔐 Page unmounted");
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    console.log("[RESET PASSWORD] 🚀 Form submitted");
+    console.log("[RESET PASSWORD] Password length:", password.length);
+    console.log("[RESET PASSWORD] Confirm password length:", confirmPassword.length);
+    
     setLoading(true);
     setError(null);
 
     if (password !== confirmPassword) {
+      console.error("[RESET PASSWORD] ❌ Passwords do not match");
       setError("Passwords do not match");
       setLoading(false);
       return;
     }
 
     if (password.length < 8) {
+      console.error("[RESET PASSWORD] ❌ Password too short");
       setError("Password must be at least 8 characters");
       setLoading(false);
       return;
     }
+
+    console.log("[RESET PASSWORD] ⏳ Sending reset request...");
+    const startTime = Date.now();
 
     try {
       const res = await fetch("/api/auth/reset-password", {
@@ -39,23 +54,51 @@ export default function ResetPasswordPage() {
         body: JSON.stringify({ password }),
       });
 
+      const duration = Date.now() - startTime;
+      console.log("[RESET PASSWORD] ⏱️ Request took:", duration, "ms");
+
       const data = await res.json();
+      console.log("[RESET PASSWORD] Response status:", res.status);
 
       if (!res.ok) {
+        console.error("[RESET PASSWORD] ❌ Error:", data.error);
         setError(data.error || "Something went wrong");
         setLoading(false);
         return;
       }
 
+      console.log("[RESET PASSWORD] ✅ Password reset successful!");
+      console.log("[RESET PASSWORD] 🔄 Redirecting to login in 3s...");
       setSuccess(true);
       setTimeout(() => {
         router.push("/login");
       }, 3000);
-    } catch {
+    } catch (err) {
+      console.error("[RESET PASSWORD] ❌ Network error:", err);
       setError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handlePasswordChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[RESET PASSWORD] 📝 Password input changed, length:", e.target.value.length);
+    setPassword(e.target.value);
+  }
+
+  function handleConfirmPasswordChange(e: React.ChangeEvent<HTMLInputElement>) {
+    console.log("[RESET PASSWORD] 📝 Confirm password input changed, length:", e.target.value.length);
+    setConfirmPassword(e.target.value);
+  }
+
+  function handleTogglePassword() {
+    console.log("[RESET PASSWORD] 👁️ Password visibility toggled:", !showPassword ? "visible" : "hidden");
+    setShowPassword(!showPassword);
+  }
+
+  function handleToggleConfirmPassword() {
+    console.log("[RESET PASSWORD] 👁️ Confirm password visibility toggled:", !showConfirmPassword ? "visible" : "hidden");
+    setShowConfirmPassword(!showConfirmPassword);
   }
 
   if (success) {
@@ -110,7 +153,7 @@ export default function ResetPasswordPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
                 required
                 minLength={8}
                 className="w-full px-4 py-3 pr-12 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
@@ -118,7 +161,7 @@ export default function ResetPasswordPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={handleTogglePassword}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -136,7 +179,7 @@ export default function ResetPasswordPage() {
                 id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={handleConfirmPasswordChange}
                 required
                 minLength={8}
                 className="w-full px-4 py-3 pr-12 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
@@ -144,7 +187,7 @@ export default function ResetPasswordPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                onClick={handleToggleConfirmPassword}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
