@@ -1,0 +1,33 @@
+{
+  "totalDurationMs": 24000,
+  "imageCount": 3,
+  "slots": [
+    {
+      "id": "slot_000",
+      "startMs": 0,
+      "endMs": 8000,
+      "prompt": "Modern content creator workspace, professional studio setup, warm lighting, cinematic style",
+      "style": "photorealistic",
+      "keywords": ["welcome", "introduction", "content creation"],
+      "text": "Introduction"
+    },
+    {
+      "id": "slot_001",
+      "startMs": 8000,
+      "endMs": 18000,
+      "prompt": "Successful entrepreneur presenting to engaged audience, conference setting, professional photography",
+      "style": "photorealistic",
+      "keywords": ["success", "audience", "value"],
+      "text": "Main Topic"
+    },
+    {
+      "id": "slot_002",
+      "startMs": 18000,
+      "endMs": 24000,
+      "prompt": "Thank you message on digital screen, subscribe button, social media icons, modern design",
+      "style": "photorealistic",
+      "keywords": ["thank you", "subscribe", "conclusion"],
+      "text": "Conclusion"
+    }
+  ]
+}

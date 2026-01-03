@@ -1,0 +1,27 @@
+{
+  "title": "Test Video Script",
+  "estimatedMinutes": 5,
+  "sections": [
+    {
+      "id": "section_000",
+      "headline": "Introduction",
+      "narrationText": "Welcome to this test video. Today we'll explore the fundamentals of effective content creation.",
+      "visualKeywords": ["welcome", "introduction", "content creation"],
+      "estimatedDurationMs": 8000
+    },
+    {
+      "id": "section_001",
+      "headline": "Main Topic",
+      "narrationText": "The key to success is understanding your audience and delivering value consistently.",
+      "visualKeywords": ["success", "audience", "value"],
+      "estimatedDurationMs": 10000
+    },
+    {
+      "id": "section_002",
+      "headline": "Conclusion",
+      "narrationText": "Thank you for watching. Don't forget to like and subscribe for more content.",
+      "visualKeywords": ["thank you", "subscribe", "conclusion"],
+      "estimatedDurationMs": 6000
+    }
+  ]
+}

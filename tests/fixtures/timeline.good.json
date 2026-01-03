@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "durationFrames": 720,
+  "theme": {
+    "primary": "#2F2B4A",
+    "secondary": "#4B6B4D",
+    "accent": "#3E356C",
+    "text": "#111827",
+    "fontFamily": "Inter"
+  },
+  "tracks": [
+    {
+      "type": "audio",
+      "src": "http://localhost:54341/storage/v1/object/public/project-assets/test/narration.mp3",
+      "volume": 1
+    }
+  ],
+  "captions": {
+    "src": "http://localhost:54341/storage/v1/object/public/project-assets/test/captions.srt",
+    "style": {
+      "enabled": true,
+      "position": "bottom",
+      "maxWidthPct": 0.86,
+      "fontSize": 44,
+      "lineHeight": 1.15,
+      "textColor": "#F7F7F7",
+      "strokeColor": "#111827",
+      "strokeWidth": 3,
+      "bgColor": "rgba(17,24,39,0.35)",
+      "bgPadding": 16,
+      "borderRadius": 18
+    }
+  },
+  "segments": [
+    {
+      "id": "slot_000",
+      "startFrame": 0,
+      "endFrame": 240,
+      "text": "Introduction",
+      "image": {
+        "src": "http://localhost:54341/storage/v1/object/public/project-assets/test/image_000.png",
+        "fit": "cover",
+        "zoom": 1.03
+      },
+      "overlays": [],
+      "transition": { "type": "cut", "durationFrames": 0 }
+    },
+    {
+      "id": "slot_001",
+      "startFrame": 240,
+      "endFrame": 540,
+      "text": "Main Topic",
+      "image": {
+        "src": "http://localhost:54341/storage/v1/object/public/project-assets/test/image_001.png",
+        "fit": "cover",
+        "zoom": 1.03
+      },
+      "overlays": [],
+      "transition": { "type": "fade", "durationFrames": 12 }
+    },
+    {
+      "id": "slot_002",
+      "startFrame": 540,
+      "endFrame": 720,
+      "text": "Conclusion",
+      "image": {
+        "src": "http://localhost:54341/storage/v1/object/public/project-assets/test/image_002.png",
+        "fit": "cover",
+        "zoom": 1.03
+      },
+      "overlays": [],
+      "transition": { "type": "fade", "durationFrames": 12 }
+    }
+  ]
+}
