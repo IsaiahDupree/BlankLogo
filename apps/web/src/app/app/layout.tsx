@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Play, Home, FolderOpen, Settings, CreditCard, LogOut, Mic, Coins } from "lucide-react";
+import { Home, Video, History, Coins, Settings, CreditCard, LogOut, Sparkles, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -54,20 +54,29 @@ export default async function AppLayout({
             </li>
             <li>
               <Link
-                href="/app/projects"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-gray-300 hover:text-white transition"
+                href="/app/remove"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-white hover:from-indigo-500/30 hover:to-purple-500/30 transition"
               >
-                <FolderOpen className="w-5 h-5" />
-                Projects
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+                Remove Watermark
               </Link>
             </li>
             <li>
               <Link
-                href="/app/settings/voice"
+                href="/app/jobs"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-gray-300 hover:text-white transition"
               >
-                <Mic className="w-5 h-5" />
-                Voice Cloning
+                <Video className="w-5 h-5" />
+                My Jobs
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/app/history"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-gray-300 hover:text-white transition"
+              >
+                <History className="w-5 h-5" />
+                History
               </Link>
             </li>
             <li>
@@ -92,12 +101,12 @@ export default async function AppLayout({
         </nav>
 
         <div className="p-4 border-t border-white/10">
-          <Link href="/app/credits" className="block p-3 rounded-lg bg-brand-500/10 border border-brand-500/20 mb-4 hover:bg-brand-500/20 transition">
-            <div className="flex items-center gap-2 text-brand-400 text-sm font-medium mb-1">
-              <CreditCard className="w-4 h-4" />
-              Credits
+          <Link href="/app/credits" className="block p-3 rounded-lg bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 mb-4 hover:from-indigo-500/20 hover:to-purple-500/20 transition">
+            <div className="flex items-center gap-2 text-indigo-400 text-sm font-medium mb-1">
+              <Zap className="w-4 h-4" />
+              Credits Available
             </div>
-            <div className="text-2xl font-bold">{credits} min</div>
+            <div className="text-2xl font-bold">{credits}</div>
           </Link>
           
           <div className="text-sm text-gray-400 mb-2 truncate">
