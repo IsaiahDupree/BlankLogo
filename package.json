@@ -45,7 +45,10 @@
     "test:redis": "bash scripts/test-services.sh redis",
     "test:api": "bash scripts/test-services.sh api",
     "test:frontend": "bash scripts/test-services.sh frontend",
-    "test:inter": "bash scripts/test-services.sh interconnection"
+    "test:inter": "bash scripts/test-services.sh interconnection",
+    "test:integration:quick": "bash scripts/run-integration-tests.sh quick",
+    "test:integration:e2e": "bash scripts/run-integration-tests.sh full",
+    "test:integration:vitest": "bash scripts/run-integration-tests.sh vitest"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
