@@ -2,59 +2,59 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Play, Loader2, CheckCircle } from "lucide-react";
+import { Loader2, ArrowLeft, Mail } from "lucide-react";
 
-export default function SignupPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
 
-  async function handleSignup(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-    if (error) {
-      setError(error.message);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        setLoading(false);
+        return;
+      }
+
+      setSent(true);
+    } catch {
+      setError("An unexpected error occurred");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setSuccess(true);
-    setLoading(false);
   }
 
-  if (success) {
+  if (sent) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center">
           <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-400" />
+            <Mail className="w-8 h-8 text-green-400" />
           </div>
           <h1 className="text-3xl font-bold mb-4">Check your email</h1>
-          <p className="text-gray-400 mb-6">
-            We sent a confirmation link to <strong className="text-white">{email}</strong>.
-            Click the link to activate your account.
+          <p className="text-gray-400 mb-8">
+            If an account exists for {email}, you will receive a password reset link shortly.
           </p>
           <Link
             href="/login"
-            className="inline-block px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-semibold"
+            className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300"
           >
-            Back to Login
+            <ArrowLeft className="w-4 h-4" />
+            Back to login
           </Link>
         </div>
       </main>
@@ -71,11 +71,11 @@ export default function SignupPage() {
             </div>
             <span className="text-2xl font-bold">BlankLogo</span>
           </Link>
-          <h1 className="text-3xl font-bold mb-2">Create your account</h1>
-          <p className="text-gray-400">Start removing watermarks in minutes</p>
+          <h1 className="text-3xl font-bold mb-2">Reset password</h1>
+          <p className="text-gray-400">Enter your email to receive a reset link</p>
         </div>
 
-        <form onSubmit={handleSignup} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               {error}
@@ -92,26 +92,9 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
               placeholder="you@example.com"
             />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-2">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition"
-              placeholder="••••••••"
-            />
-            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
           </div>
 
           <button
@@ -122,18 +105,18 @@ export default function SignupPage() {
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Creating account...
+                Sending...
               </>
             ) : (
-              "Create Account"
+              "Send Reset Link"
             )}
           </button>
         </form>
 
         <p className="text-center text-gray-400 mt-6">
-          Already have an account?{" "}
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-300">
-            Sign in
+          <Link href="/login" className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1">
+            <ArrowLeft className="w-4 h-4" />
+            Back to login
           </Link>
         </p>
       </div>

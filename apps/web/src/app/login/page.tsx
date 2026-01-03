@@ -39,11 +39,13 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <img src="/images/logo-icon.png" alt="CanvasCast" className="w-12 h-12" />
-            <span className="text-2xl font-bold">CanvasCast</span>
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <span className="text-2xl font-bold">B</span>
+            </div>
+            <span className="text-2xl font-bold">BlankLogo</span>
           </Link>
           <h1 className="text-3xl font-bold mb-2">Welcome back</h1>
-          <p className="text-gray-400">Sign in to continue creating videos</p>
+          <p className="text-gray-400">Sign in to remove watermarks</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -83,10 +85,16 @@ export default function LoginPage() {
             />
           </div>
 
+          <div className="flex justify-end">
+            <Link href="/forgot-password" className="text-sm text-gray-400 hover:text-white">
+              Forgot password?
+            </Link>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
@@ -101,7 +109,7 @@ export default function LoginPage() {
 
         <p className="text-center text-gray-400 mt-6">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-brand-400 hover:text-brand-300">
+          <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">
             Sign up
           </Link>
         </p>
