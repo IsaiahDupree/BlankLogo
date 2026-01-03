@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import { Check, Zap, Crown, Rocket, Gift } from "lucide-react";
 
@@ -68,23 +71,38 @@ const TIER_ICONS = {
 } as const;
 
 export default function PricingPage() {
+  useEffect(() => {
+    console.log("[PRICING PAGE] 💰 Page mounted");
+    console.log("[PRICING PAGE] Tiers available:", PRICING_TIERS.map(t => `${t.name} ($${t.price})`).join(", "));
+    return () => console.log("[PRICING PAGE] 💰 Page unmounted");
+  }, []);
+
+  function handleTierClick(tierName: string, price: number) {
+    console.log(`[PRICING] 🛒 Tier clicked: ${tierName} ($${price})`);
+  }
+
+  function handleLinkClick(linkName: string) {
+    console.log(`[PRICING] 🔗 ${linkName} clicked`);
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
       <header className="border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" onClick={() => handleLinkClick("Logo/Home")} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold">
               B
             </div>
             <span className="text-xl font-bold">BlankLogo</span>
           </Link>
           <nav className="flex items-center gap-4">
-            <Link href="/login" className="text-gray-400 hover:text-white transition">
+            <Link href="/login" onClick={() => handleLinkClick("Log in")} className="text-gray-400 hover:text-white transition">
               Log in
             </Link>
             <Link
               href="/signup"
+              onClick={() => handleLinkClick("Get Started (header)")}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition"
             >
               Get Started
@@ -156,6 +174,7 @@ export default function PricingPage() {
 
               <Link
                 href="/signup"
+                onClick={() => handleTierClick(tier.name, tier.price)}
                 className={`block w-full py-3 rounded-lg font-semibold text-center transition ${
                   isPopular
                     ? "bg-blue-600 hover:bg-blue-500 text-white"
@@ -213,6 +232,7 @@ export default function PricingPage() {
           </p>
           <Link
             href="/signup"
+            onClick={() => handleLinkClick("Get Started Free (CTA)")}
             className="inline-block px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-lg transition"
           >
             Get Started Free
