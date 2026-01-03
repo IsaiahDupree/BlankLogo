@@ -6,6 +6,7 @@ import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
+import os from 'os';
 
 config();
 
@@ -23,7 +24,7 @@ type LifecycleEvent = 'STARTING' | 'READY' | 'STOPPING' | 'STOPPED' | 'CRASH' |
 
 const SERVICE_NAME = 'api';
 const RUN_ID = `${SERVICE_NAME}-${uuidv4().slice(0, 8)}`;
-const INSTANCE_ID = `${require('os').hostname()}:${PORT}`;
+const INSTANCE_ID = `${os.hostname()}:${PORT}`;
 const startTimestamp = Date.now();
 const BUILD_VERSION = process.env.BUILD_VERSION || '1.0.0';
 const BUILD_COMMIT = process.env.BUILD_COMMIT || 'dev';
