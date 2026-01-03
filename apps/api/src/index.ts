@@ -10,21 +10,61 @@ import { config } from 'dotenv';
 config();
 
 const app: express.Application = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8989;
 
-// Redis connection
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+// Redis connection with error handling
+let redis: Redis | null = null;
+let redisConnected = false;
 
-// Job queue
-const jobQueue = new Queue('watermark-removal', {
-  connection: redis,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 1000 },
-    removeOnComplete: 100,
-    removeOnFail: 50,
-  },
-});
+try {
+  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    maxRetriesPerRequest: 3,
+    connectTimeout: 5000,
+    lazyConnect: true,
+    enableOfflineQueue: false,
+  });
+
+  redis.on('connect', () => {
+    console.log('[REDIS] ✅ Connected');
+    redisConnected = true;
+  });
+
+  redis.on('error', (err) => {
+    console.error('[REDIS] ❌ Connection error:', err.message);
+    redisConnected = false;
+  });
+
+  redis.on('close', () => {
+    console.log('[REDIS] 🔌 Connection closed');
+    redisConnected = false;
+  });
+
+  // Try to connect but don't block
+  redis.connect().catch((err) => {
+    console.error('[REDIS] ❌ Initial connection failed:', err.message);
+  });
+} catch (err) {
+  console.error('[REDIS] ❌ Failed to initialize Redis:', err);
+}
+
+// Job queue (may be null if Redis unavailable)
+let jobQueue: Queue | null = null;
+if (redis) {
+  try {
+    jobQueue = new Queue('watermark-removal', {
+      connection: redis,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+        removeOnComplete: 100,
+        removeOnFail: 50,
+      },
+    });
+    console.log('[QUEUE] ✅ Job queue initialized');
+  } catch (err) {
+    console.error('[QUEUE] ❌ Failed to initialize job queue:', err);
+  }
+}
 
 // Supabase client
 const supabase = createClient(
@@ -168,7 +208,15 @@ const PLATFORM_PRESETS: Record<string, { cropPixels: number; cropPosition: 'bott
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  console.log('[HEALTH] Health check requested');
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    services: {
+      redis: redisConnected ? 'connected' : 'disconnected',
+      queue: jobQueue ? 'ready' : 'unavailable',
+    }
+  });
 });
 
 // API v1 Routes
@@ -212,6 +260,10 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
     };
 
     // Add to queue
+    if (!jobQueue) {
+      console.error('[API] ❌ Job queue not available');
+      return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
+    }
     await jobQueue.add('remove-watermark', jobData, { jobId });
 
     // Store job in database
@@ -289,6 +341,10 @@ app.post('/api/v1/jobs/upload', authenticateToken, upload.single('video'), async
     };
 
     // Add to queue
+    if (!jobQueue) {
+      console.error('[API] ❌ Job queue not available for upload');
+      return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
+    }
     await jobQueue.add('remove-watermark', jobData, { jobId });
 
     // Store job in database
@@ -433,6 +489,10 @@ app.post('/api/v1/jobs/batch', authenticateToken, async (req: AuthenticatedReque
         metadata: { batch_id: batchId },
       };
 
+      if (!jobQueue) {
+        console.error('[API] ❌ Job queue not available for batch');
+        return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
+      }
       await jobQueue.add('remove-watermark', jobData, { jobId });
 
       await supabase.from('bl_jobs').insert({
@@ -469,9 +529,11 @@ app.delete('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedRe
     const { jobId } = req.params;
 
     // Remove from queue if still pending
-    const job = await jobQueue.getJob(jobId);
-    if (job) {
-      await job.remove();
+    if (jobQueue) {
+      const job = await jobQueue.getJob(jobId);
+      if (job) {
+        await job.remove();
+      }
     }
 
     // Update database
