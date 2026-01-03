@@ -95,10 +95,8 @@ test.describe("Webhook Notifications", () => {
 });
 
 test.describe("Email Notifications (via Mailpit)", () => {
-  test.skip(
-    !process.env.MAILPIT_URL,
-    "Mailpit URL not configured - skipping email tests"
-  );
+  // Mailpit is available at localhost:54354 for local development
+  const MAILPIT_URL = process.env.MAILPIT_URL || "http://localhost:54354";
 
   test("sends completion email when job finishes", async ({ request }) => {
     const testEmail = `test-${Date.now()}@blanklogo.test`;
