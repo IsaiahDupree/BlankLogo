@@ -1,6 +1,6 @@
 # Groq Transcription Service
 
-CanvasCast uses **Groq's Whisper API** as the primary transcription provider for audio alignment. Groq offers free, fast, and accurate transcription using Whisper Large V3.
+BlankLogo uses **Groq's Whisper API** as the primary transcription provider for audio alignment. Groq offers free, fast, and accurate transcription using Whisper Large V3.
 
 ## Overview
 
@@ -158,7 +158,7 @@ For 1 hour of audio transcription:
 | Deepgram | $0.26 |
 | AssemblyAI | $0.39 |
 
-**CanvasCast saves 100% on transcription costs by using Groq as the primary provider.**
+**BlankLogo saves 100% on transcription costs by using Groq as the primary provider.**
 
 ## Troubleshooting
 

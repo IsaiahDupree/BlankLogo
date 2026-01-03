@@ -44,7 +44,7 @@ export async function generateVoice(
 
     await insertJobEvent(ctx.jobId, "VOICE_GEN", `Generating audio for ${script.sections.length} sections...`);
 
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "canvascast-tts-"));
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "blanklogo-tts-"));
     const sectionPaths: string[] = [];
     let totalDurationMs = 0;
 

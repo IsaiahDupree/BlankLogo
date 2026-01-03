@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { JobStatus, JobErrorCode } from "@canvascast/shared";
+import type { JobStatus, JobErrorCode } from "@blanklogo/shared";
 import {
   type PipelineContext,
   type JobRow,

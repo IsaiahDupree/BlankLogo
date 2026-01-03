@@ -1,5 +1,5 @@
 -- =========================
--- CanvasCast: Core Enums
+-- BlankLogo: Core Enums
 -- =========================
 do $$ begin
   create type public.project_status as enum ('draft', 'generating', 'ready', 'failed');

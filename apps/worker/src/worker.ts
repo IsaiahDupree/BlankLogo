@@ -25,7 +25,7 @@ async function claimNextJob(): Promise<JobRow | null> {
 }
 
 async function main() {
-  console.log(`🚀 CanvasCast worker online: ${WORKER_NAME}`);
+  console.log(`🚀 BlankLogo worker online: ${WORKER_NAME}`);
   console.log(`   Polling every ${POLL_INTERVAL_MS}ms`);
 
   while (true) {

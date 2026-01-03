@@ -1,4 +1,4 @@
-# CanvasCast Cost Model & Pricing
+# BlankLogo Cost Model & Pricing
 
 Realistic cost model for generating faceless long-form videos with HF TTS + OpenAI Whisper timestamps + OpenAI image generation.
 

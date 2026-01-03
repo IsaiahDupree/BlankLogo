@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "pnpm --filter @canvascast/web build",
+  "buildCommand": "pnpm --filter @blanklogo/web build",
   "installCommand": "pnpm install",
   "outputDirectory": "apps/web/.next",
   "regions": ["iad1"],

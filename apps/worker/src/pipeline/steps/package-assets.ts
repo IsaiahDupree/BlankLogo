@@ -16,7 +16,7 @@ export async function packageAssets(
   ctx: PipelineContext
 ): Promise<StepResult<{ zipPath: string }>> {
   try {
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "canvascast-package-"));
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "blanklogo-package-"));
     const zipPath = path.join(tempDir, "assets.zip");
 
     // Create zip archive
@@ -51,7 +51,7 @@ export async function packageAssets(
     }
 
     // Add README
-    const readme = `# CanvasCast Video Assets
+    const readme = `# BlankLogo Video Assets
     
 Project: ${ctx.project.title}
 Generated: ${new Date().toISOString()}

@@ -1,5 +1,5 @@
 -- ============================================
--- CanvasCast Seed Data
+-- BlankLogo Seed Data
 -- Storage buckets and initial data
 -- ============================================
 

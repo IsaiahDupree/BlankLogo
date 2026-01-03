@@ -1,4 +1,4 @@
-# CanvasCast Worker Pipeline Specification v1
+# BlankLogo Worker Pipeline Specification v1
 
 The worker pipeline processes jobs through a series of steps, producing a final video and asset pack.
 
@@ -8,7 +8,7 @@ The worker pipeline processes jobs through a series of steps, producing a final 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         CANVASCAST WORKER PIPELINE                          │
+│                         BLANKLOGO WORKER PIPELINE                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐  │
@@ -374,7 +374,7 @@ Render final video using Remotion.
 
 2. **Render Execution**
    ```bash
-   npx remotion render CanvasCastVideo \
+   npx remotion render BlankLogoVideo \
      --props=timeline.json \
      --output=final.mp4 \
      --codec=h264 \

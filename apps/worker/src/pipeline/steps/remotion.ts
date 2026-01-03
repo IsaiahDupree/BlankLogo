@@ -2,7 +2,7 @@ import type { PipelineContext } from "../index.js";
 import type { ScriptResult } from "./scripting.js";
 import type { TTSResult } from "./tts.js";
 import type { VisualsResult } from "./visuals.js";
-import { TimelineSchema, type Timeline, type Segment, type Caption } from "@canvascast/shared";
+import { TimelineSchema, type Timeline, type Segment, type Caption } from "@blanklogo/shared";
 import fs from "node:fs/promises";
 import path from "node:path";
 

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@canvascast/shared"],
+  transpilePackages: ["@blanklogo/shared"],
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

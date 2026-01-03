@@ -52,7 +52,7 @@ export async function runAlignment(
     }
 
     // Save to temp file
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "canvascast-whisper-"));
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "blanklogo-whisper-"));
     const audioPath = path.join(tempDir, "narration.mp3");
     await fs.writeFile(audioPath, Buffer.from(await audioData.arrayBuffer()));
 

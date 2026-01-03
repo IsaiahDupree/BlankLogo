@@ -1,6 +1,6 @@
-# CanvasCast PRD
+# BlankLogo PRD
 
-> **One-liner**: CanvasCast turns your notes + niche into a 10-minute YouTube-ready video (narration, visuals, captions), delivered as a downloadable MP4 + asset pack.
+> **One-liner**: BlankLogo turns your notes + niche into a 10-minute YouTube-ready video (narration, visuals, captions), delivered as a downloadable MP4 + asset pack.
 
 ## Product Overview
 
@@ -247,7 +247,7 @@ SUPABASE_SERVICE_ROLE_KEY=<from supabase start>
 
 # Resend
 RESEND_API_KEY=re_...
-RESEND_FROM="CanvasCast <hello@yourdomain.com>"
+RESEND_FROM="BlankLogo <hello@yourdomain.com>"
 
 # OpenAI
 OPENAI_API_KEY=sk-...

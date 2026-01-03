@@ -1,5 +1,5 @@
 -- ============================================
--- CanvasCast MVP Schema Additions
+-- BlankLogo MVP Schema Additions
 -- project_inputs, template_packs, job_events, user voices
 -- ============================================
 
@@ -72,11 +72,11 @@ CREATE TABLE IF NOT EXISTS public.template_packs (
 
 -- Default templates
 INSERT INTO public.template_packs (id, name, description, composition_id, sort_order) VALUES
-  ('minimal', 'Clean Minimal', 'Simple, distraction-free style with focus on content', 'CanvasCastVideo', 0),
-  ('cinematic', 'Cinematic', 'Movie-like feel with dramatic transitions', 'CanvasCastVideo', 1),
-  ('documentary', 'Documentary', 'Ken Burns style with subtle motion', 'CanvasCastVideo', 2),
-  ('educational', 'Educational', 'Clear visuals with text overlays', 'CanvasCastVideo', 3),
-  ('energetic', 'Energetic', 'Fast-paced cuts for engaging content', 'CanvasCastVideo', 4)
+  ('minimal', 'Clean Minimal', 'Simple, distraction-free style with focus on content', 'BlankLogoVideo', 0),
+  ('cinematic', 'Cinematic', 'Movie-like feel with dramatic transitions', 'BlankLogoVideo', 1),
+  ('documentary', 'Documentary', 'Ken Burns style with subtle motion', 'BlankLogoVideo', 2),
+  ('educational', 'Educational', 'Clear visuals with text overlays', 'BlankLogoVideo', 3),
+  ('energetic', 'Energetic', 'Fast-paced cuts for engaging content', 'BlankLogoVideo', 4)
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================

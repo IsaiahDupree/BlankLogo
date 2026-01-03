@@ -56,7 +56,7 @@ export async function processJob(job: JobRow, supabase: SupabaseClient) {
   const path = await import("node:path");
   const os = await import("node:os");
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `canvascast-${jobId}-`));
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `blanklogo-${jobId}-`));
 
   const ctx: PipelineContext = {
     job,

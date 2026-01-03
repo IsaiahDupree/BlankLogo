@@ -1,4 +1,4 @@
-# CanvasCast Timeline Contract v1
+# BlankLogo Timeline Contract v1
 
 The `timeline.json` file is the core data contract between the AI pipeline and Remotion templates.
 
@@ -384,16 +384,16 @@ export function validateTimelineSegments(timeline: Timeline): string[] {
 The Remotion composition consumes this timeline:
 
 ```tsx
-// packages/remotion/src/compositions/CanvasCastVideo.tsx
+// packages/remotion/src/compositions/BlankLogoVideo.tsx
 
 import { useCurrentFrame, Audio, Img, AbsoluteFill, interpolate } from 'remotion';
-import type { Timeline, Segment, Caption } from '@canvascast/shared';
+import type { Timeline, Segment, Caption } from '@blanklogo/shared';
 
 interface Props {
   timeline: Timeline;
 }
 
-export const CanvasCastVideo: React.FC<Props> = ({ timeline }) => {
+export const BlankLogoVideo: React.FC<Props> = ({ timeline }) => {
   const frame = useCurrentFrame();
   
   // Find current segment

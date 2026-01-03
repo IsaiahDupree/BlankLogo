@@ -32,7 +32,7 @@ export async function renderVideo(
       return createStepError("ERR_RENDER", "No timeline available for rendering");
     }
 
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "canvascast-render-"));
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "blanklogo-render-"));
     const outputPath = path.join(tempDir, "final.mp4");
     const timelineLocalPath = path.join(tempDir, "timeline.json");
     await fs.writeFile(timelineLocalPath, JSON.stringify(timeline, null, 2));
@@ -43,7 +43,7 @@ export async function renderVideo(
       const remotionPath = path.resolve(__dirname, "../../../../packages/remotion");
       const remotionBin = path.join(remotionPath, "node_modules/.bin/remotion");
       
-      const cmd = `"${remotionBin}" render src/index.ts CanvasCastVideo "${outputPath}" --props "${timelineLocalPath}" --codec h264 --crf 18`;
+      const cmd = `"${remotionBin}" render src/index.ts BlankLogoVideo "${outputPath}" --props "${timelineLocalPath}" --codec h264 --crf 18`;
       console.log(`[Render] ${cmd}`);
       await execAsync(cmd, { cwd: remotionPath, timeout: 300000 });
     } else {

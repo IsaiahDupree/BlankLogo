@@ -25,7 +25,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./"),
-      "@canvascast/shared": path.resolve(__dirname, "./packages/shared/src"),
+      "@blanklogo/shared": path.resolve(__dirname, "./packages/shared/src"),
     },
   },
 });

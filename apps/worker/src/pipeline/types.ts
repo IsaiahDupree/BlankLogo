@@ -1,4 +1,4 @@
-import type { JobStatus, JobErrorCode } from "@canvascast/shared";
+import type { JobStatus, JobErrorCode } from "@blanklogo/shared";
 
 // ============================================
 // WORKER PIPELINE TYPES

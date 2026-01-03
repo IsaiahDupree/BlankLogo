@@ -69,10 +69,10 @@ export async function POST(req: Request) {
 
     const subject =
       kind === "job_completed"
-        ? "✅ Your CanvasCast video is ready"
+        ? "✅ Your BlankLogo video is ready"
         : kind === "job_started"
-          ? "🎬 CanvasCast started rendering your video"
-          : "❌ CanvasCast couldn't finish your render";
+          ? "🎬 BlankLogo started processing your video"
+          : "❌ BlankLogo couldn't finish your job";
 
     const html =
       kind === "job_completed"
@@ -134,19 +134,19 @@ function jobCompletedEmail({ projectUrl }: { projectUrl: string }) {
   return `
   <div style="font-family: ui-sans-serif, system-ui; line-height: 1.5">
     <h2>✅ Your video is ready</h2>
-    <p>Your CanvasCast render finished. You can download the MP4 + asset pack now.</p>
+    <p>Your BlankLogo watermark removal is complete. You can download the processed video now.</p>
     <p><a href="${projectUrl}">Open your project →</a></p>
-    <p style="color:#666;font-size:12px">CanvasCast</p>
+    <p style="color:#666;font-size:12px">BlankLogo</p>
   </div>`;
 }
 
 function jobStartedEmail({ projectUrl }: { projectUrl: string }) {
   return `
   <div style="font-family: ui-sans-serif, system-ui; line-height: 1.5">
-    <h2>🎬 Render started</h2>
-    <p>CanvasCast is generating your script, voice, visuals, and render timeline.</p>
+    <h2>🎬 Processing started</h2>
+    <p>BlankLogo is removing the watermark from your video.</p>
     <p><a href="${projectUrl}">View status →</a></p>
-    <p style="color:#666;font-size:12px">CanvasCast</p>
+    <p style="color:#666;font-size:12px">BlankLogo</p>
   </div>`;
 }
 
@@ -162,10 +162,10 @@ function jobFailedEmail({
     : "";
   return `
   <div style="font-family: ui-sans-serif, system-ui; line-height: 1.5">
-    <h2>❌ Render failed</h2>
-    <p>Something broke during the job. You can retry from the project page.</p>
+    <h2>❌ Processing failed</h2>
+    <p>Something went wrong during the job. You can retry from the project page.</p>
     ${err}
     <p><a href="${projectUrl}">Open your project →</a></p>
-    <p style="color:#666;font-size:12px">CanvasCast</p>
+    <p style="color:#666;font-size:12px">BlankLogo</p>
   </div>`;
 }

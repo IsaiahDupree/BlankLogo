@@ -34,8 +34,10 @@ export default async function AppLayout({
       <aside className="w-64 bg-gray-900 border-r border-white/10 flex flex-col">
         <div className="p-6">
           <Link href="/app" className="flex items-center gap-2">
-            <img src="/images/logo-icon.png" alt="CanvasCast" className="w-10 h-10" />
-            <span className="text-xl font-bold">CanvasCast</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <span className="text-xl font-bold">B</span>
+            </div>
+            <span className="text-xl font-bold">BlankLogo</span>
           </Link>
         </div>
 

@@ -1,4 +1,4 @@
-# CanvasCast Deployment Guide
+# BlankLogo Deployment Guide
 
 ## Architecture Overview
 
@@ -159,7 +159,7 @@ railway up
 
 ### Vercel (Web App)
 1. Settings → Domains → Add Domain
-2. Add your domain (e.g., `app.canvascast.com`)
+2. Add your domain (e.g., `app.blanklogo.com`)
 3. Configure DNS as instructed
 
 ### Update Environment Variables
@@ -230,8 +230,8 @@ After setting domains, update:
 supabase start
 
 # Terminal 2: Start web app
-pnpm --filter @canvascast/web dev
+pnpm --filter @blanklogo/web dev
 
 # Terminal 3: Start worker
-pnpm --filter @canvascast/worker dev
+pnpm --filter @blanklogo/worker dev
 ```

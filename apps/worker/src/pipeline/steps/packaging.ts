@@ -1,5 +1,5 @@
 import type { PipelineContext } from "../index.js";
-import type { Timeline } from "@canvascast/shared";
+import type { Timeline } from "@blanklogo/shared";
 import fs from "node:fs/promises";
 import path from "node:path";
 import archiver from "archiver";
