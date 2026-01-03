@@ -23,7 +23,7 @@ const PLATFORMS = [
 
 export default function UploadPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [mode, setMode] = useState<"url" | "upload">("upload");
+  const [mode, setMode] = useState<"url" | "upload">("url");
   const [videoUrl, setVideoUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [platform, setPlatform] = useState("sora");
