@@ -206,7 +206,21 @@ const PLATFORM_PRESETS: Record<string, { cropPixels: number; cropPosition: 'bott
   custom: { cropPixels: 100, cropPosition: 'bottom' },
 };
 
-// Health check
+// Track server start time and request counts
+const serverStartTime = new Date();
+let requestCount = 0;
+let errorCount = 0;
+
+// Request counter middleware
+app.use((req, res, next) => {
+  requestCount++;
+  res.on('finish', () => {
+    if (res.statusCode >= 400) errorCount++;
+  });
+  next();
+});
+
+// Basic health check (always responds, even if services down)
 app.get('/health', (req, res) => {
   console.log('[HEALTH] Health check requested');
   res.json({ 
@@ -218,6 +232,155 @@ app.get('/health', (req, res) => {
     }
   });
 });
+
+// Liveness probe - is the server process alive?
+app.get('/live', (req, res) => {
+  console.log('[LIVE] Liveness probe');
+  res.status(200).json({ alive: true, timestamp: new Date().toISOString() });
+});
+
+// Readiness probe - is the server ready to accept traffic?
+app.get('/ready', async (req, res) => {
+  console.log('[READY] Readiness probe');
+  const checks = {
+    redis: redisConnected,
+    queue: !!jobQueue,
+    supabase: false,
+  };
+
+  // Check Supabase connectivity
+  try {
+    const { error } = await supabase.from('bl_jobs').select('id').limit(1);
+    checks.supabase = !error;
+  } catch {
+    checks.supabase = false;
+  }
+
+  const isReady = checks.redis && checks.queue && checks.supabase;
+  
+  console.log('[READY] Status:', { isReady, checks });
+  
+  res.status(isReady ? 200 : 503).json({
+    ready: isReady,
+    timestamp: new Date().toISOString(),
+    checks,
+  });
+});
+
+// Comprehensive status endpoint
+app.get('/status', async (req, res) => {
+  console.log('[STATUS] Full status check requested');
+  
+  const uptime = Math.floor((Date.now() - serverStartTime.getTime()) / 1000);
+  
+  // Redis ping check
+  let redisPing = false;
+  let redisLatency = -1;
+  if (redis) {
+    try {
+      const start = Date.now();
+      await redis.ping();
+      redisLatency = Date.now() - start;
+      redisPing = true;
+    } catch (err) {
+      console.error('[STATUS] Redis ping failed:', err);
+    }
+  }
+
+  // Supabase check
+  let supabaseOk = false;
+  let supabaseLatency = -1;
+  try {
+    const start = Date.now();
+    const { error } = await supabase.from('bl_jobs').select('id').limit(1);
+    supabaseLatency = Date.now() - start;
+    supabaseOk = !error;
+  } catch (err) {
+    console.error('[STATUS] Supabase check failed:', err);
+  }
+
+  // Queue stats
+  let queueStats = null;
+  if (jobQueue) {
+    try {
+      const [waiting, active, completed, failed] = await Promise.all([
+        jobQueue.getWaitingCount(),
+        jobQueue.getActiveCount(),
+        jobQueue.getCompletedCount(),
+        jobQueue.getFailedCount(),
+      ]);
+      queueStats = { waiting, active, completed, failed };
+    } catch (err) {
+      console.error('[STATUS] Queue stats failed:', err);
+    }
+  }
+
+  const status = {
+    status: 'operational',
+    version: process.env.npm_package_version || '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    uptime: {
+      seconds: uptime,
+      human: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s`,
+    },
+    stats: {
+      requestCount,
+      errorCount,
+      errorRate: requestCount > 0 ? ((errorCount / requestCount) * 100).toFixed(2) + '%' : '0%',
+    },
+    services: {
+      redis: {
+        connected: redisConnected,
+        ping: redisPing,
+        latencyMs: redisLatency,
+      },
+      queue: {
+        available: !!jobQueue,
+        stats: queueStats,
+      },
+      supabase: {
+        connected: supabaseOk,
+        latencyMs: supabaseLatency,
+      },
+    },
+    memory: {
+      heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+      heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+      rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + 'MB',
+    },
+  };
+
+  // Determine overall health
+  const allHealthy = redisConnected && redisPing && supabaseOk && !!jobQueue;
+  if (!allHealthy) {
+    status.status = 'degraded';
+  }
+
+  console.log('[STATUS] Response:', status.status);
+  res.json(status);
+});
+
+// Debug endpoint (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug', (req, res) => {
+    console.log('[DEBUG] Debug info requested');
+    res.json({
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: PORT,
+        REDIS_URL: process.env.REDIS_URL ? '***configured***' : 'not set',
+        SUPABASE_URL: process.env.SUPABASE_URL ? '***configured***' : 'not set',
+      },
+      process: {
+        pid: process.pid,
+        platform: process.platform,
+        nodeVersion: process.version,
+        uptime: process.uptime(),
+      },
+    });
+  });
+}
 
 // API v1 Routes
 
@@ -561,9 +724,91 @@ app.get('/api/v1/platforms', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`BlankLogo API running on port ${PORT}`);
+// Global error handler
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[ERROR] Unhandled error:', err.message);
+  console.error('[ERROR] Stack:', err.stack);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
+  });
 });
+
+// 404 handler
+app.use((req, res) => {
+  console.log(`[404] Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ error: 'Not found', path: req.path });
+});
+
+// Graceful startup with port conflict handling
+async function startServer(port: number, maxRetries = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const server = app.listen(port, () => {
+          console.log('');
+          console.log('╔════════════════════════════════════════════╗');
+          console.log('║         BlankLogo API Server               ║');
+          console.log('╠════════════════════════════════════════════╣');
+          console.log(`║  Port:     ${port}                            ║`);
+          console.log(`║  ENV:      ${(process.env.NODE_ENV || 'development').padEnd(28)}║`);
+          console.log(`║  Redis:    ${(redisConnected ? '✅ Connected' : '❌ Disconnected').padEnd(28)}║`);
+          console.log(`║  Queue:    ${(jobQueue ? '✅ Ready' : '❌ Unavailable').padEnd(28)}║`);
+          console.log('╠════════════════════════════════════════════╣');
+          console.log('║  Endpoints:                                ║');
+          console.log('║    GET  /health  - Basic health check      ║');
+          console.log('║    GET  /live    - Liveness probe          ║');
+          console.log('║    GET  /ready   - Readiness probe         ║');
+          console.log('║    GET  /status  - Full status report      ║');
+          console.log('╚════════════════════════════════════════════╝');
+          console.log('');
+          resolve();
+        });
+
+        server.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE') {
+            console.error(`[STARTUP] ❌ Port ${port} is already in use (attempt ${attempt}/${maxRetries})`);
+            reject(err);
+          } else {
+            reject(err);
+          }
+        });
+      });
+      return; // Success
+    } catch (err) {
+      if (attempt === maxRetries) {
+        console.error(`[STARTUP] ❌ Failed to start server after ${maxRetries} attempts`);
+        console.error('[STARTUP] Try: lsof -ti:' + port + ' | xargs kill -9');
+        process.exit(1);
+      }
+      // Wait before retry
+      console.log(`[STARTUP] ⏳ Waiting 2s before retry...`);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('[SHUTDOWN] SIGTERM received, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('[SHUTDOWN] SIGINT received, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Unhandled rejection at:', promise, 'reason:', reason);
+});
+
+// Start the server
+startServer(Number(PORT));
 
 export default app;
