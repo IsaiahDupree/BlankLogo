@@ -48,7 +48,11 @@
     "test:inter": "bash scripts/test-services.sh interconnection",
     "test:integration:quick": "bash scripts/run-integration-tests.sh quick",
     "test:integration:e2e": "bash scripts/run-integration-tests.sh full",
-    "test:integration:vitest": "bash scripts/run-integration-tests.sh vitest"
+    "test:integration:vitest": "bash scripts/run-integration-tests.sh vitest",
+    "test:lifecycle": "bash scripts/test-lifecycle.sh",
+    "test:lifecycle:startup": "bash scripts/test-lifecycle.sh startup",
+    "test:lifecycle:shutdown": "bash scripts/test-lifecycle.sh shutdown",
+    "test:lifecycle:restart": "bash scripts/test-lifecycle.sh restart 3"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
