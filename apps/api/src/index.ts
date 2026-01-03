@@ -12,6 +12,96 @@ config();
 const app: express.Application = express();
 const PORT = process.env.PORT || 8989;
 
+// ═══════════════════════════════════════════════════════════════════
+// SERVICE STATE MACHINE & STRUCTURED LOGGING
+// ═══════════════════════════════════════════════════════════════════
+
+type ServiceState = 'starting' | 'ready' | 'degraded' | 'stopping' | 'stopped' | 'crashed';
+type LifecycleEvent = 'STARTING' | 'READY' | 'STOPPING' | 'STOPPED' | 'CRASH' | 
+                      'DEPENDENCY_DOWN' | 'DEPENDENCY_UP' | 'READY_TIMEOUT' | 'CRASH_LOOP';
+
+const SERVICE_NAME = 'api';
+const RUN_ID = `${SERVICE_NAME}-${uuidv4().slice(0, 8)}`;
+const startTimestamp = Date.now();
+
+let currentState: ServiceState = 'starting';
+let previousState: ServiceState = 'stopped';
+
+// Dependency status tracking
+const dependencies = {
+  redis: { up: false, lastCheck: 0, consecutiveFailures: 0, consecutiveSuccesses: 0 },
+  supabase: { up: false, lastCheck: 0, consecutiveFailures: 0, consecutiveSuccesses: 0 },
+};
+
+// Structured log function
+function logEvent(event: LifecycleEvent, reason: string, extra?: Record<string, unknown>) {
+  const logEntry = {
+    ts: new Date().toISOString(),
+    service: SERVICE_NAME,
+    event,
+    state: currentState,
+    reason,
+    run_id: RUN_ID,
+    uptime_ms: Date.now() - startTimestamp,
+    ...extra,
+  };
+  console.log(JSON.stringify(logEntry));
+}
+
+// State transition function
+function setState(newState: ServiceState, reason: string) {
+  if (newState === currentState) return;
+  
+  previousState = currentState;
+  currentState = newState;
+  
+  const eventMap: Record<ServiceState, LifecycleEvent> = {
+    starting: 'STARTING',
+    ready: 'READY',
+    degraded: 'DEPENDENCY_DOWN',
+    stopping: 'STOPPING',
+    stopped: 'STOPPED',
+    crashed: 'CRASH',
+  };
+  
+  logEvent(eventMap[newState], reason, { previous_state: previousState });
+}
+
+// Update dependency status (only log on transitions)
+function updateDependency(name: keyof typeof dependencies, isUp: boolean, reason?: string) {
+  const dep = dependencies[name];
+  const wasUp = dep.up;
+  
+  if (isUp) {
+    dep.consecutiveSuccesses++;
+    dep.consecutiveFailures = 0;
+    if (dep.consecutiveSuccesses >= 2 && !dep.up) {
+      dep.up = true;
+      logEvent('DEPENDENCY_UP', `${name} is now available`, { dependency: name });
+    }
+  } else {
+    dep.consecutiveFailures++;
+    dep.consecutiveSuccesses = 0;
+    if (dep.consecutiveFailures >= 2 && dep.up) {
+      dep.up = false;
+      logEvent('DEPENDENCY_DOWN', reason || `${name} is unavailable`, { dependency: name });
+    }
+  }
+  
+  dep.lastCheck = Date.now();
+  
+  // Update overall state based on dependencies
+  const allDepsUp = Object.values(dependencies).every(d => d.up);
+  if (currentState === 'ready' && !allDepsUp) {
+    setState('degraded', `Dependency ${name} is down`);
+  } else if (currentState === 'degraded' && allDepsUp) {
+    setState('ready', 'All dependencies restored');
+  }
+}
+
+// Log startup
+logEvent('STARTING', 'API server initializing', { port: PORT });
+
 // Redis connection with error handling
 let redis: Redis | null = null;
 let redisConnected = false;
@@ -220,9 +310,77 @@ app.use((req, res, next) => {
   next();
 });
 
-// Basic health check (always responds, even if services down)
+// ═══════════════════════════════════════════════════════════════════
+// KUBERNETES-STYLE HEALTH ENDPOINTS
+// ═══════════════════════════════════════════════════════════════════
+
+// /healthz - Liveness probe (is process alive?)
+app.get('/healthz', (req, res) => {
+  // Always return 200 if the process is running
+  res.status(200).json({
+    status: 'alive',
+    service: SERVICE_NAME,
+    run_id: RUN_ID,
+    state: currentState,
+    uptime_ms: Date.now() - startTimestamp,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// /readyz - Readiness probe (can accept traffic?)
+app.get('/readyz', async (req, res) => {
+  // Check all dependencies
+  let redisOk = false;
+  let supabaseOk = false;
+  
+  // Redis check
+  if (redis) {
+    try {
+      await redis.ping();
+      redisOk = true;
+      updateDependency('redis', true);
+    } catch (err) {
+      updateDependency('redis', false, `Redis ping failed: ${err}`);
+    }
+  }
+  
+  // Supabase check
+  try {
+    const { error } = await supabase.from('bl_jobs').select('id').limit(1);
+    supabaseOk = !error;
+    updateDependency('supabase', supabaseOk, error?.message);
+  } catch (err) {
+    updateDependency('supabase', false, `Supabase query failed: ${err}`);
+  }
+  
+  const isReady = redisOk && supabaseOk && !!jobQueue;
+  
+  // Update state if needed
+  if (isReady && currentState === 'starting') {
+    setState('ready', 'All dependencies available');
+  } else if (isReady && currentState === 'degraded') {
+    setState('ready', 'Dependencies restored');
+  } else if (!isReady && currentState === 'ready') {
+    setState('degraded', 'One or more dependencies unavailable');
+  }
+  
+  res.status(isReady ? 200 : 503).json({
+    ready: isReady,
+    service: SERVICE_NAME,
+    run_id: RUN_ID,
+    state: currentState,
+    uptime_ms: Date.now() - startTimestamp,
+    timestamp: new Date().toISOString(),
+    checks: {
+      redis: { up: redisOk, consecutive_failures: dependencies.redis.consecutiveFailures },
+      supabase: { up: supabaseOk, consecutive_failures: dependencies.supabase.consecutiveFailures },
+      queue: { up: !!jobQueue },
+    },
+  });
+});
+
+// Legacy endpoints (keep for backward compatibility)
 app.get('/health', (req, res) => {
-  console.log('[HEALTH] Health check requested');
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
@@ -233,22 +391,17 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Liveness probe - is the server process alive?
 app.get('/live', (req, res) => {
-  console.log('[LIVE] Liveness probe');
   res.status(200).json({ alive: true, timestamp: new Date().toISOString() });
 });
 
-// Readiness probe - is the server ready to accept traffic?
 app.get('/ready', async (req, res) => {
-  console.log('[READY] Readiness probe');
   const checks = {
     redis: redisConnected,
     queue: !!jobQueue,
     supabase: false,
   };
 
-  // Check Supabase connectivity
   try {
     const { error } = await supabase.from('bl_jobs').select('id').limit(1);
     checks.supabase = !error;
@@ -257,8 +410,6 @@ app.get('/ready', async (req, res) => {
   }
 
   const isReady = checks.redis && checks.queue && checks.supabase;
-  
-  console.log('[READY] Status:', { isReady, checks });
   
   res.status(isReady ? 200 : 503).json({
     ready: isReady,

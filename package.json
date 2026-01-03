@@ -52,7 +52,12 @@
     "test:lifecycle": "bash scripts/test-lifecycle.sh",
     "test:lifecycle:startup": "bash scripts/test-lifecycle.sh startup",
     "test:lifecycle:shutdown": "bash scripts/test-lifecycle.sh shutdown",
-    "test:lifecycle:restart": "bash scripts/test-lifecycle.sh restart 3"
+    "test:lifecycle:restart": "bash scripts/test-lifecycle.sh restart 3",
+    "test:harness": "bash scripts/test-harness.sh",
+    "test:harness:quick": "bash scripts/test-harness.sh quick",
+    "test:harness:baseline": "bash scripts/test-harness.sh baseline",
+    "test:harness:crash": "bash scripts/test-harness.sh crash",
+    "test:harness:depdown": "bash scripts/test-harness.sh depdown"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
