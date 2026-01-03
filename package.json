@@ -1,5 +1,5 @@
 {
-  "name": "canvascast",
+  "name": "blanklogo",
   "version": "0.0.1",
   "private": true,
   "workspaces": [
@@ -7,10 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm --filter @canvascast/web dev",
-    "dev:worker": "pnpm --filter @canvascast/worker dev",
-    "build": "pnpm --filter @canvascast/web build",
-    "lint": "pnpm --filter @canvascast/web lint",
+    "dev": "pnpm --filter @blanklogo/web dev",
+    "dev:worker": "pnpm --filter @blanklogo/worker dev",
+    "dev:api": "pnpm --filter @blanklogo/api dev",
+    "build": "pnpm --filter @blanklogo/web build",
+    "build:api": "pnpm --filter @blanklogo/api build",
+    "lint": "pnpm --filter @blanklogo/web lint",
     "test": "vitest run --exclude tests/db",
     "test:watch": "vitest --exclude tests/db",
     "test:coverage": "vitest run --coverage --exclude tests/db",

@@ -5,9 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CanvasCast - Turn Your Passion Into Videos",
+  title: "BlankLogo - Remove Watermarks from AI Videos",
   description:
-    "Transform your notes and ideas into professional YouTube-ready videos with AI-powered narration, visuals, and captions.",
+    "Instantly remove watermarks from Sora, TikTok, Runway, Pika, and other AI-generated videos. Fast, clean, professional results.",
 };
 
 export default function RootLayout({

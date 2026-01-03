@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { ArrowRight, Play, Sparkles, Download, Mic } from "lucide-react";
+import { ArrowRight, Zap, Shield, Clock, Upload, Download, Video } from "lucide-react";
+
+const PLATFORMS = [
+  { id: "sora", name: "Sora", color: "from-purple-500 to-pink-500" },
+  { id: "tiktok", name: "TikTok", color: "from-cyan-500 to-blue-500" },
+  { id: "runway", name: "Runway", color: "from-green-500 to-emerald-500" },
+  { id: "pika", name: "Pika", color: "from-orange-500 to-red-500" },
+  { id: "kling", name: "Kling", color: "from-blue-500 to-indigo-500" },
+  { id: "luma", name: "Luma", color: "from-yellow-500 to-orange-500" },
+];
 
 export default function Home() {
   return (
@@ -7,16 +16,21 @@ export default function Home() {
       {/* Header */}
       <header className="container mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/images/logo-icon.png" alt="CanvasCast" className="w-10 h-10" />
-          <span className="text-xl font-bold">CanvasCast</span>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <span className="text-xl font-bold">B</span>
+          </div>
+          <span className="text-xl font-bold">BlankLogo</span>
         </div>
         <nav className="flex items-center gap-6">
           <Link href="/pricing" className="text-gray-300 hover:text-white transition">
             Pricing
           </Link>
+          <Link href="#platforms" className="text-gray-300 hover:text-white transition">
+            Platforms
+          </Link>
           <Link
             href="/login"
-            className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 transition font-medium"
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
           >
             Get Started
           </Link>
@@ -25,26 +39,26 @@ export default function Home() {
 
       {/* Hero */}
       <section className="container mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm mb-6">
-          <Sparkles className="w-4 h-4" />
-          <span>AI-Powered Video Creation</span>
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm mb-6">
+          <Zap className="w-4 h-4" />
+          <span>Remove Watermarks Instantly</span>
         </div>
         
         <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-          Turn Your Passion<br />Into Videos
+          Clean AI Videos<br />In Seconds
         </h1>
         
         <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-          Transform your notes and ideas into professional 10-minute YouTube-ready videos
-          with AI-powered narration, stunning visuals, and accurate captions.
+          Remove watermarks from Sora, TikTok, Runway, Pika, and other AI-generated videos.
+          Fast processing, original quality, no re-encoding.
         </p>
         
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
-            href="/login"
-            className="px-8 py-4 rounded-xl bg-brand-600 hover:bg-brand-500 transition font-semibold text-lg flex items-center gap-2"
+            href="/app"
+            className="px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-semibold text-lg flex items-center gap-2"
           >
-            Start Creating <ArrowRight className="w-5 h-5" />
+            Remove Watermark <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
             href="#how-it-works"
@@ -53,47 +67,56 @@ export default function Home() {
             See How It Works
           </Link>
         </div>
+
+        {/* Platform Pills */}
+        <div className="flex flex-wrap justify-center gap-3 mt-12">
+          {PLATFORMS.map((platform) => (
+            <Link
+              key={platform.id}
+              href={`/remove/${platform.id}`}
+              className={`px-4 py-2 rounded-full bg-gradient-to-r ${platform.color} text-white text-sm font-medium hover:opacity-90 transition`}
+            >
+              {platform.name} Watermark
+            </Link>
+          ))}
+        </div>
       </section>
 
-      {/* Features */}
+      {/* How It Works */}
       <section id="how-it-works" className="container mx-auto px-6 py-24">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-          Create Videos in 4 Simple Steps
+          Remove Watermarks in 3 Steps
         </h2>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           {[
             {
               step: "1",
-              title: "Pick Your Niche",
-              description: "Choose from explainer, motivation, facts, history, and more preset styles.",
-              icon: "🎯",
+              title: "Upload Your Video",
+              description: "Drag and drop or paste a URL. We support MP4, MOV, WebM up to 500MB.",
+              icon: <Upload className="w-8 h-8" />,
             },
             {
               step: "2",
-              title: "Add Your Content",
-              description: "Paste your notes, upload documents, or describe your video idea.",
-              icon: "📝",
+              title: "Auto-Detect Platform",
+              description: "We automatically detect the watermark type and apply the perfect crop settings.",
+              icon: <Zap className="w-8 h-8" />,
             },
             {
               step: "3",
-              title: "Choose Your Voice",
-              description: "Select from professional voices or bring your own voice to life.",
-              icon: "🎙️",
-            },
-            {
-              step: "4",
-              title: "Download & Publish",
-              description: "Get your MP4, captions, and all assets ready to upload to YouTube.",
-              icon: "🚀",
+              title: "Download Clean Video",
+              description: "Get your watermark-free video in seconds. Original quality preserved.",
+              icon: <Download className="w-8 h-8" />,
             },
           ].map((feature) => (
             <div
               key={feature.step}
-              className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-brand-500/50 transition"
+              className="p-8 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 transition text-center"
             >
-              <div className="text-4xl mb-4">{feature.icon}</div>
-              <div className="text-sm text-brand-400 font-medium mb-2">Step {feature.step}</div>
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                {feature.icon}
+              </div>
+              <div className="text-sm text-indigo-400 font-medium mb-2">Step {feature.step}</div>
               <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
               <p className="text-gray-400">{feature.description}</p>
             </div>
@@ -101,40 +124,73 @@ export default function Home() {
         </div>
       </section>
 
-      {/* What You Get */}
+      {/* Supported Platforms */}
+      <section id="platforms" className="container mx-auto px-6 py-24 border-t border-white/10">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
+          Supported Platforms
+        </h2>
+        <p className="text-gray-400 text-center mb-16 max-w-2xl mx-auto">
+          Remove watermarks from all major AI video generators and social platforms
+        </p>
+        
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {[
+            { name: "Sora", desc: "OpenAI's text-to-video AI", pixels: 100, href: "/remove/sora" },
+            { name: "TikTok", desc: "TikTok video watermarks", pixels: 80, href: "/remove/tiktok" },
+            { name: "Runway", desc: "Runway Gen-2 videos", pixels: 60, href: "/remove/runway" },
+            { name: "Pika", desc: "Pika Labs AI videos", pixels: 50, href: "/remove/pika" },
+            { name: "Kling", desc: "Kuaishou Kling AI", pixels: 70, href: "/remove/kling" },
+            { name: "Luma", desc: "Dream Machine videos", pixels: 55, href: "/remove/luma" },
+          ].map((platform) => (
+            <Link
+              key={platform.name}
+              href={platform.href}
+              className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-white/10 transition group"
+            >
+              <h3 className="text-xl font-semibold mb-2 group-hover:text-indigo-400 transition">
+                {platform.name}
+              </h3>
+              <p className="text-gray-400 text-sm mb-3">{platform.desc}</p>
+              <span className="text-xs text-gray-500">Default crop: {platform.pixels}px</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Features */}
       <section className="container mx-auto px-6 py-24 border-t border-white/10">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-          Everything You Need to Start
+          Why Choose BlankLogo
         </h2>
         
         <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           <div className="text-center p-6">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 flex items-center justify-center">
-              <Play className="w-8 h-8 text-brand-400" />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+              <Clock className="w-8 h-8 text-indigo-400" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">HD Video</h3>
+            <h3 className="text-xl font-semibold mb-2">Lightning Fast</h3>
             <p className="text-gray-400">
-              1080p MP4 ready for YouTube, with smooth transitions and animations.
+              Process videos in 5-15 seconds. No waiting, no queues for small files.
             </p>
           </div>
           
           <div className="text-center p-6">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 flex items-center justify-center">
-              <Mic className="w-8 h-8 text-brand-400" />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+              <Video className="w-8 h-8 text-indigo-400" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Pro Narration</h3>
+            <h3 className="text-xl font-semibold mb-2">Original Quality</h3>
             <p className="text-gray-400">
-              Natural-sounding AI voices with accurate captions (SRT/VTT).
+              No re-encoding. Audio preserved. Your video stays crisp and clear.
             </p>
           </div>
           
           <div className="text-center p-6">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 flex items-center justify-center">
-              <Download className="w-8 h-8 text-brand-400" />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+              <Shield className="w-8 h-8 text-indigo-400" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Full Assets</h3>
+            <h3 className="text-xl font-semibold mb-2">Private & Secure</h3>
             <p className="text-gray-400">
-              Download your script, images, audio, and project files.
+              Videos auto-delete after 7 days. We never share your content.
             </p>
           </div>
         </div>
@@ -142,25 +198,25 @@ export default function Home() {
 
       {/* CTA */}
       <section className="container mx-auto px-6 py-24">
-        <div className="max-w-4xl mx-auto p-12 rounded-3xl bg-gradient-to-r from-brand-600 to-brand-500 text-center">
+        <div className="max-w-4xl mx-auto p-12 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Create Your First Video?
+            Ready to Clean Your Videos?
           </h2>
           <p className="text-xl text-white/80 mb-8">
-            Start with 10 free minutes. No credit card required.
+            Start with 10 free videos. No credit card required.
           </p>
           <Link
-            href="/login"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-brand-600 font-semibold text-lg hover:bg-gray-100 transition"
+            href="/app"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-indigo-600 font-semibold text-lg hover:bg-gray-100 transition"
           >
-            Get Started Free <ArrowRight className="w-5 h-5" />
+            Remove Watermark Free <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="container mx-auto px-6 py-8 border-t border-white/10 text-center text-gray-500">
-        <p>&copy; {new Date().getFullYear()} CanvasCast. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} BlankLogo. All rights reserved.</p>
       </footer>
     </main>
   );

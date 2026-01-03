@@ -1,0 +1,28 @@
+# BlankLogo Watermark Inpainting Service
+# Python dependencies for quality mode
+
+# Core
+numpy>=1.24.0
+opencv-python>=4.8.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# YOLO Detection
+ultralytics>=8.0.0
+
+# Inpainting (IOPaint/LAMA)
+# Using iopaint for LAMA model
+iopaint>=1.2.0
+
+# Video processing
+ffmpeg-python>=0.2.0
+
+# Utilities
+loguru>=0.7.0
+pydantic>=2.0.0
+tqdm>=4.65.0
+
+# HTTP server for Node.js integration
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
