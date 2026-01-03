@@ -5,6 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { CreditCard, Check, Loader2, ExternalLink, Zap, Crown, Rocket } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
+// Logging utility
+function logCredits(message: string, data?: unknown) {
+  console.log(`[PAGE: CREDITS] ${message}`, data !== undefined ? data : "");
+}
+
 const PRICING_TIERS = [
   { id: "starter", name: "Starter", price: 9, credits: 10 },
   { id: "pro", name: "Pro", price: 29, credits: 50, popular: true },
@@ -34,21 +39,33 @@ export default function CreditsPage() {
   const success = searchParams.get("success");
   const canceled = searchParams.get("canceled");
 
+  useEffect(() => {
+    logCredits("💳 Credits page loaded");
+    if (success) logCredits("✅ Payment success detected");
+    if (canceled) logCredits("⚠️ Payment canceled detected");
+  }, [success, canceled]);
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
   const fetchCredits = useCallback(async () => {
+    logCredits("🔍 Fetching credits...");
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        logCredits("❌ No user found");
+        return;
+      }
+      logCredits("👤 User:", user.id);
 
       // Get credit balance
       const { data: balance } = await supabase.rpc("get_credit_balance", {
         p_user_id: user.id,
       });
       setCredits(balance ?? 0);
+      logCredits("💰 Credit balance:", balance);
 
       // Get subscription status
       const { data: profile } = await supabase
@@ -58,8 +75,9 @@ export default function CreditsPage() {
         .maybeSingle();
 
       setSubscriptionTier(profile?.subscription_tier ?? null);
+      logCredits("📋 Subscription tier:", profile?.subscription_tier);
     } catch (err) {
-      console.error("Failed to fetch credits:", err);
+      logCredits("❌ Error fetching credits:", err);
     } finally {
       setLoading(false);
     }
@@ -70,9 +88,11 @@ export default function CreditsPage() {
   }, [fetchCredits]);
 
   async function handlePurchase(packId: string, isSubscription: boolean = false) {
+    logCredits("🛒 Purchase initiated:", { packId, isSubscription });
     setPurchasing(packId);
 
     try {
+      logCredits("⏳ Creating checkout session...");
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,14 +103,16 @@ export default function CreditsPage() {
       });
 
       const data = await res.json();
+      logCredits("📦 Checkout response:", { status: res.status, hasUrl: !!data.url });
 
       if (data.url) {
+        logCredits("🔗 Redirecting to Stripe checkout...");
         window.location.href = data.url;
       } else {
-        console.error("No checkout URL returned");
+        logCredits("❌ No checkout URL returned");
       }
     } catch (err) {
-      console.error("Checkout failed:", err);
+      logCredits("❌ Checkout failed:", err);
     } finally {
       setPurchasing(null);
     }

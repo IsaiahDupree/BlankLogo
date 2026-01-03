@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Zap, Shield, Clock, Upload, Download, Video } from "lucide-react";
+import { useEffect } from "react";
 
 const PLATFORMS = [
   { id: "sora", name: "Sora", color: "from-purple-500 to-pink-500" },
@@ -11,6 +14,20 @@ const PLATFORMS = [
 ];
 
 export default function Home() {
+  useEffect(() => {
+    console.log("[PAGE: HOME] 🏠 Homepage loaded");
+    console.log("[PAGE: HOME] Available platforms:", PLATFORMS.map(p => p.name).join(", "));
+    console.log("[PAGE: HOME] Timestamp:", new Date().toISOString());
+  }, []);
+
+  const handlePlatformClick = (platformId: string) => {
+    console.log("[PAGE: HOME] 🎯 Platform clicked:", platformId);
+  };
+
+  const handleCTAClick = (action: string) => {
+    console.log("[PAGE: HOME] 🚀 CTA clicked:", action);
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white">
       {/* Header */}

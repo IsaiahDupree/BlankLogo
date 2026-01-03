@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
+
+// Logging utility
+function logNewProject(message: string, data?: unknown) {
+  console.log(`[PAGE: NEW PROJECT] ${message}`, data !== undefined ? data : "");
+}
 
 const NICHE_PRESETS = [
   { id: "motivation", label: "Motivation", emoji: "💪" },
@@ -28,7 +33,12 @@ export default function NewProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  useEffect(() => {
+    logNewProject("🆕 New project page loaded");
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
+    logNewProject("📝 Form submitted", { title, niche, length });
     e.preventDefault();
     if (!title || !niche) {
       setError("Please fill in all required fields");
@@ -39,6 +49,7 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
+      logNewProject("⏳ Creating project...");
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,13 +61,17 @@ export default function NewProjectPage() {
       });
 
       const data = await res.json();
+      logNewProject("📦 API response:", { status: res.status, data });
 
       if (!res.ok) {
+        logNewProject("❌ Project creation failed:", data.error);
         throw new Error(data.error || "Failed to create project");
       }
 
+      logNewProject("✅ Project created:", data.project?.id);
       router.push(`/app/projects/${data.project.id}`);
     } catch (err: unknown) {
+      logNewProject("❌ Error:", err);
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }

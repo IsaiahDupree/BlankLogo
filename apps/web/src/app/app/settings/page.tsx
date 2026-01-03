@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Bell, Mail, Loader2, CheckCircle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
+// Logging utility
+function logSettings(message: string, data?: unknown) {
+  console.log(`[PAGE: SETTINGS] ${message}`, data !== undefined ? data : "");
+}
+
 type NotificationPrefs = {
   email_job_started: boolean;
   email_job_completed: boolean;
@@ -28,15 +33,24 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    logSettings("⚙️ Settings page loaded");
+  }, []);
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
   const fetchPrefs = useCallback(async () => {
+    logSettings("🔍 Fetching preferences...");
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        logSettings("❌ No user found");
+        return;
+      }
+      logSettings("👤 User:", user.id);
 
       const { data } = await supabase
         .from("user_notification_prefs")
@@ -45,6 +59,7 @@ export default function SettingsPage() {
         .maybeSingle();
 
       if (data) {
+        logSettings("✅ Preferences loaded:", data);
         setPrefs({
           email_job_started: data.email_job_started,
           email_job_completed: data.email_job_completed,
@@ -53,9 +68,11 @@ export default function SettingsPage() {
           email_account_status: data.email_account_status,
           marketing_opt_in: data.marketing_opt_in,
         });
+      } else {
+        logSettings("ℹ️ Using default preferences");
       }
     } catch (err) {
-      console.error("Failed to load preferences:", err);
+      logSettings("❌ Failed to load preferences:", err);
     } finally {
       setLoading(false);
     }
@@ -66,12 +83,16 @@ export default function SettingsPage() {
   }, [fetchPrefs]);
 
   async function handleSave() {
+    logSettings("💾 Saving preferences...", prefs);
     setSaving(true);
     setSaved(false);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        logSettings("❌ No user found");
+        return;
+      }
 
       const { error } = await supabase
         .from("user_notification_prefs")
@@ -81,18 +102,23 @@ export default function SettingsPage() {
           updated_at: new Date().toISOString(),
         });
 
-      if (error) throw error;
+      if (error) {
+        logSettings("❌ Save failed:", error);
+        throw error;
+      }
 
+      logSettings("✅ Preferences saved successfully");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      console.error("Failed to save preferences:", err);
+      logSettings("❌ Failed to save preferences:", err);
     } finally {
       setSaving(false);
     }
   }
 
   function togglePref(key: keyof NotificationPrefs) {
+    logSettings("🔄 Toggling preference:", key);
     setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 

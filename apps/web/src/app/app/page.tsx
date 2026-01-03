@@ -2,6 +2,11 @@ import Link from "next/link";
 import { Plus, Clock, CheckCircle, XCircle, Loader2, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
+// Server-side logging for dashboard
+function logDashboard(message: string, data?: unknown) {
+  console.log(`[PAGE: DASHBOARD] ${message}`, data ? JSON.stringify(data) : "");
+}
+
 interface BlJob {
   id: string;
   status: string;
@@ -13,12 +18,19 @@ interface BlJob {
 }
 
 async function getRecentJobs(): Promise<BlJob[]> {
+  logDashboard("🔍 Fetching recent jobs...");
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("bl_jobs")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(10);
+  
+  if (error) {
+    logDashboard("❌ Error fetching jobs:", error.message);
+  } else {
+    logDashboard(`✅ Found ${data?.length ?? 0} jobs`);
+  }
   
   return (data as BlJob[]) ?? [];
 }
@@ -52,7 +64,9 @@ function getStatusLabel(status: string) {
 }
 
 export default async function DashboardPage() {
+  logDashboard("📊 Dashboard page rendering...");
   const jobs = await getRecentJobs();
+  logDashboard("📊 Dashboard loaded", { jobCount: jobs.length });
 
   return (
     <div className="p-8">
