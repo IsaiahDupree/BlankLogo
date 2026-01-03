@@ -254,36 +254,52 @@ test.describe("API Endpoints Tests", () => {
 
   test.describe("6. Authentication & Authorization", () => {
     test("6.1 Unauthenticated request blocked", async ({ request }) => {
-      const response = await request.get(`${API_URL}/api/v1/jobs`);
+      // Test job creation without auth token
+      const response = await request.post(`${API_URL}/api/v1/jobs`, {
+        headers: { "Content-Type": "application/json" },
+        data: { video_url: "https://example.com/test.mp4" },
+      });
       
-      // Should return 401 or similar
-      expect([401, 403, 500].includes(response.status()) || response.ok()).toBe(true);
-      console.log(`✓ Unauth blocked: ${response.status()}`);
+      // Should return 401 (Authentication required)
+      expect(response.status()).toBe(401);
+      const body = await response.json();
+      expect(body.code).toBe("NO_TOKEN");
+      console.log(`✓ Unauth blocked: ${response.status()} - ${body.code}`);
     });
 
     test("6.2 Invalid token rejected", async ({ request }) => {
-      const response = await request.get(`${API_URL}/api/v1/jobs`, {
+      const response = await request.post(`${API_URL}/api/v1/jobs`, {
         headers: {
           Authorization: "Bearer invalid_token_12345",
+          "Content-Type": "application/json",
         },
+        data: { video_url: "https://example.com/test.mp4" },
       });
 
-      expect([401, 403, 500].includes(response.status()) || response.ok()).toBe(true);
-      console.log(`✓ Invalid token: ${response.status()}`);
+      // Should return 401 (Invalid token)
+      expect(response.status()).toBe(401);
+      const body = await response.json();
+      expect(body.code).toBe("INVALID_TOKEN");
+      console.log(`✓ Invalid token: ${response.status()} - ${body.code}`);
     });
 
     test("6.3 Expired token handled", async ({ request }) => {
       // Use a clearly expired/invalid JWT
       const expiredToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZXhwIjoxfQ.invalid";
       
-      const response = await request.get(`${API_URL}/api/v1/jobs`, {
+      const response = await request.post(`${API_URL}/api/v1/jobs`, {
         headers: {
           Authorization: `Bearer ${expiredToken}`,
+          "Content-Type": "application/json",
         },
+        data: { video_url: "https://example.com/test.mp4" },
       });
 
-      expect([401, 403, 500].includes(response.status()) || response.ok()).toBe(true);
-      console.log(`✓ Expired token: ${response.status()}`);
+      // Should return 401 (Invalid or expired token)
+      expect(response.status()).toBe(401);
+      const body = await response.json();
+      expect(body.code).toBe("INVALID_TOKEN");
+      console.log(`✓ Expired token: ${response.status()} - ${body.code}`);
     });
   });
 
@@ -382,7 +398,7 @@ test.describe("API Endpoints Tests", () => {
       const response = await request.fetch(`${API_URL}/api/v1/jobs`, {
         method: "OPTIONS",
         headers: {
-          Origin: "http://localhost:3838",
+          Origin: "http://localhost:3939",
           "Access-Control-Request-Method": "POST",
         },
       });

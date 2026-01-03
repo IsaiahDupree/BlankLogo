@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  * Tests response times and performance metrics for all user-facing flows
  */
 
-const BASE_URL = "http://localhost:3838";
+const BASE_URL = "http://localhost:3939";
 const API_URL = "http://localhost:8989";
 
 // Performance thresholds (in milliseconds)

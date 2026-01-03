@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  * Tests all services working together end-to-end
  */
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3838";
+const BASE_URL = process.env.BASE_URL || "http://localhost:3939";
 const API_URL = process.env.API_URL || "http://localhost:8989";
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54351";
 const MAILPIT_URL = process.env.MAILPIT_URL || "http://localhost:54354";
@@ -483,14 +483,19 @@ test.describe("Full Integration Tests - All Services", () => {
     });
 
     test("8.2 Unauthorized API request returns 401/403", async ({ request }) => {
-      const response = await request.get(`${API_URL}/api/v1/jobs`, {
+      // Test job creation with invalid token
+      const response = await request.post(`${API_URL}/api/v1/jobs`, {
         headers: {
           Authorization: "Bearer invalid_token",
+          "Content-Type": "application/json",
         },
+        data: { video_url: "https://example.com/test.mp4" },
       });
 
-      expect([401, 403, 500].includes(response.status())).toBe(true);
-      console.log(`✓ Unauthorized request handled`);
+      expect(response.status()).toBe(401);
+      const body = await response.json();
+      expect(body.code).toBe("INVALID_TOKEN");
+      console.log(`✓ Unauthorized request handled: ${response.status()}`);
     });
 
     test("8.3 Invalid endpoint returns 404", async ({ request }) => {

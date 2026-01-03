@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  * Ensures all services are reachable and healthy before running other tests
  */
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3838";
+const BASE_URL = process.env.BASE_URL || "http://localhost:3939";
 const API_URL = process.env.API_URL || "http://localhost:8989";
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54351";
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";

@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  * Verifies each button click produces the expected result
  */
 
-const BASE_URL = "http://localhost:3838";
+const BASE_URL = "http://localhost:3939";
 const API_URL = process.env.API_URL || "http://localhost:8989";
 
 test.describe("Landing Page Button Interactions", () => {

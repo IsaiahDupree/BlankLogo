@@ -9,7 +9,7 @@ import { config } from 'dotenv';
 
 config();
 
-const app = express();
+const app: express.Application = express();
 const PORT = process.env.PORT || 8080;
 
 // Redis connection
@@ -38,6 +38,70 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Authentication middleware
+interface AuthenticatedRequest extends express.Request {
+  user?: {
+    id: string;
+    email?: string;
+  };
+}
+
+const authenticateToken = async (
+  req: AuthenticatedRequest,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace('Bearer ', '');
+
+  console.log('[AUTH] 🔐 Checking authentication...');
+
+  if (!token) {
+    console.log('[AUTH] ❌ No token provided');
+    return res.status(401).json({ error: 'Authentication required', code: 'NO_TOKEN' });
+  }
+
+  try {
+    // Verify token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      console.log('[AUTH] ❌ Invalid or expired token:', error?.message);
+      return res.status(401).json({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' });
+    }
+
+    console.log('[AUTH] ✅ Authenticated user:', user.id);
+    req.user = { id: user.id, email: user.email };
+    next();
+  } catch (err) {
+    console.error('[AUTH] ❌ Auth error:', err);
+    return res.status(401).json({ error: 'Authentication failed', code: 'AUTH_ERROR' });
+  }
+};
+
+// Optional auth - allows unauthenticated but attaches user if token present
+const optionalAuth = async (
+  req: AuthenticatedRequest,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace('Bearer ', '');
+
+  if (token) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        req.user = { id: user.id, email: user.email };
+        console.log('[AUTH] ✅ Optional auth: user attached:', user.id);
+      }
+    } catch {
+      // Ignore errors for optional auth
+    }
+  }
+  next();
+};
 
 // File upload config
 const upload = multer({
@@ -109,8 +173,8 @@ app.get('/health', (req, res) => {
 
 // API v1 Routes
 
-// Create a new watermark removal job
-app.post('/api/v1/jobs', async (req, res) => {
+// Create a new watermark removal job (requires authentication)
+app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       video_url,
@@ -153,6 +217,7 @@ app.post('/api/v1/jobs', async (req, res) => {
     // Store job in database
     await supabase.from('bl_jobs').insert({
       id: jobId,
+      user_id: req.user?.id,
       status: 'queued',
       input_url: video_url,
       input_filename: jobData.inputFilename,
@@ -177,8 +242,8 @@ app.post('/api/v1/jobs', async (req, res) => {
   }
 });
 
-// Upload video file directly
-app.post('/api/v1/jobs/upload', upload.single('video'), async (req, res) => {
+// Upload video file directly (requires authentication)
+app.post('/api/v1/jobs/upload', authenticateToken, upload.single('video'), async (req: AuthenticatedRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file provided' });
@@ -253,8 +318,8 @@ app.post('/api/v1/jobs/upload', upload.single('video'), async (req, res) => {
   }
 });
 
-// Get job status
-app.get('/api/v1/jobs/:jobId', async (req, res) => {
+// Get job status (requires authentication)
+app.get('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { jobId } = req.params;
 
@@ -302,8 +367,8 @@ app.get('/api/v1/jobs/:jobId', async (req, res) => {
   }
 });
 
-// Get download URL for completed job
-app.get('/api/v1/jobs/:jobId/download', async (req, res) => {
+// Get download URL for completed job (requires authentication)
+app.get('/api/v1/jobs/:jobId/download', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { jobId } = req.params;
 
@@ -335,8 +400,8 @@ app.get('/api/v1/jobs/:jobId/download', async (req, res) => {
   }
 });
 
-// Batch job creation
-app.post('/api/v1/jobs/batch', async (req, res) => {
+// Batch job creation (requires authentication)
+app.post('/api/v1/jobs/batch', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { videos, crop_pixels, crop_position, platform = 'sora', processing_mode = 'crop', webhook_url } = req.body;
 
@@ -398,8 +463,8 @@ app.post('/api/v1/jobs/batch', async (req, res) => {
   }
 });
 
-// Delete/cancel job
-app.delete('/api/v1/jobs/:jobId', async (req, res) => {
+// Delete/cancel job (requires authentication)
+app.delete('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { jobId } = req.params;
 

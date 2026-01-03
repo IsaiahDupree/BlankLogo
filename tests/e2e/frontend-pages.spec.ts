@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  * Tests all frontend pages render correctly
  */
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3838";
+const BASE_URL = process.env.BASE_URL || "http://localhost:3939";
 
 test.describe("Frontend Pages Tests", () => {
   test.describe("1. Public Pages", () => {

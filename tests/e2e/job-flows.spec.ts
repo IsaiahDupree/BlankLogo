@@ -5,8 +5,8 @@ import { test, expect } from "@playwright/test";
  * Tests the complete watermark removal job pipeline
  */
 
-const BASE_URL = "http://localhost:3838";
-const API_URL = "http://localhost:3838/api";
+const BASE_URL = "http://localhost:3939";
+const API_URL = "http://localhost:3939/api";
 
 // Test video URL
 const TEST_VIDEO_URL = "https://www.w3schools.com/html/mov_bbb.mp4";

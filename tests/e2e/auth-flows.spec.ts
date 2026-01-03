@@ -10,8 +10,8 @@ import { test, expect } from "@playwright/test";
  * - Account deletion
  */
 
-const BASE_URL = "http://localhost:3838";
-const API_URL = "http://localhost:3838/api";
+const BASE_URL = "http://localhost:3939";
+const API_URL = "http://localhost:3939/api";
 
 // Test user credentials
 const TEST_USER = {
