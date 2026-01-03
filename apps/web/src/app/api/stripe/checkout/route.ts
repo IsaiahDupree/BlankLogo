@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe, STRIPE_PRICE_IDS } from "@/lib/stripe";
-import { CREDIT_PACKS, PRICING_TIERS } from "@canvascast/shared";
 
 export async function POST(request: Request) {
   const supabase = await createClient();

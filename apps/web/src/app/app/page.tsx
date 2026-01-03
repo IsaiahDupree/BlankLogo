@@ -1,27 +1,36 @@
 import Link from "next/link";
-import { Plus, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Plus, Clock, CheckCircle, XCircle, Loader2, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import type { Project, Job } from "@canvascast/shared";
 
-async function getRecentProjects(): Promise<(Project & { jobs: Job[] })[]> {
+interface BlJob {
+  id: string;
+  status: string;
+  platform: string;
+  input_filename: string;
+  output_url: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+async function getRecentJobs(): Promise<BlJob[]> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("projects")
-    .select("*, jobs(*)")
+    .from("bl_jobs")
+    .select("*")
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(10);
   
-  return (data as (Project & { jobs: Job[] })[]) ?? [];
+  return (data as BlJob[]) ?? [];
 }
 
 function getStatusIcon(status: string) {
   switch (status) {
-    case "ready":
+    case "completed":
       return <CheckCircle className="w-5 h-5 text-green-400" />;
     case "failed":
       return <XCircle className="w-5 h-5 text-red-400" />;
-    case "generating":
-      return <Loader2 className="w-5 h-5 text-brand-400 animate-spin" />;
+    case "processing":
+      return <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />;
     default:
       return <Clock className="w-5 h-5 text-gray-400" />;
   }
@@ -29,90 +38,93 @@ function getStatusIcon(status: string) {
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case "ready":
-      return "Ready";
+    case "completed":
+      return "Completed";
     case "failed":
       return "Failed";
-    case "generating":
-      return "Generating...";
+    case "processing":
+      return "Processing...";
+    case "queued":
+      return "Queued";
     default:
-      return "Draft";
+      return status;
   }
 }
 
 export default async function DashboardPage() {
-  const projects = await getRecentProjects();
+  const jobs = await getRecentJobs();
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-gray-400">Create and manage your video projects</p>
+          <p className="text-gray-400">Your recent watermark removal jobs</p>
         </div>
         <Link
-          href="/app/new"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 transition font-medium"
+          href="/app/upload"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition font-medium"
         >
           <Plus className="w-5 h-5" />
-          New Project
+          New Job
         </Link>
       </div>
 
-      {projects.length === 0 ? (
+      {jobs.length === 0 ? (
         <div className="text-center py-16 px-6 rounded-2xl bg-white/5 border border-white/10">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-500/10 flex items-center justify-center">
-            <Plus className="w-8 h-8 text-brand-400" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/10 flex items-center justify-center">
+            <Video className="w-8 h-8 text-blue-400" />
           </div>
-          <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
+          <h2 className="text-xl font-semibold mb-2">No jobs yet</h2>
           <p className="text-gray-400 mb-6">
-            Create your first video project to get started
+            Upload a video to remove watermarks
           </p>
           <Link
-            href="/app/new"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-brand-600 hover:bg-brand-500 transition font-medium"
+            href="/app/upload"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 transition font-medium"
           >
             <Plus className="w-5 h-5" />
-            Create Project
+            Upload Video
           </Link>
         </div>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-300">Recent Projects</h2>
+          <h2 className="text-lg font-semibold text-gray-300">Recent Jobs</h2>
           <div className="grid gap-4">
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/app/projects/${project.id}`}
-                className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-brand-500/50 transition flex items-center gap-4"
+            {jobs.map((job: BlJob) => (
+              <div
+                key={job.id}
+                className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center gap-4"
               >
                 <div className="flex-1">
-                  <h3 className="font-semibold mb-1">{project.title}</h3>
+                  <h3 className="font-semibold mb-1">{job.input_filename || job.id}</h3>
                   <div className="flex items-center gap-4 text-sm text-gray-400">
-                    <span className="capitalize">{project.niche_preset}</span>
-                    <span>{project.target_minutes} min</span>
+                    <span className="capitalize">{job.platform}</span>
                     <span>
-                      {new Date(project.created_at).toLocaleDateString()}
+                      {new Date(job.created_at).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(project.status)}
-                  <span className="text-sm text-gray-300">
-                    {getStatusLabel(project.status)}
-                  </span>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(job.status)}
+                    <span className="text-sm text-gray-300">
+                      {getStatusLabel(job.status)}
+                    </span>
+                  </div>
+                  {job.status === "completed" && job.output_url && (
+                    <a
+                      href={job.output_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-sm hover:bg-green-500/30 transition"
+                    >
+                      Download
+                    </a>
+                  )}
                 </div>
-              </Link>
+              </div>
             ))}
-          </div>
-          
-          <div className="text-center pt-4">
-            <Link
-              href="/app/projects"
-              className="text-brand-400 hover:text-brand-300 text-sm"
-            >
-              View all projects →
-            </Link>
           </div>
         </div>
       )}

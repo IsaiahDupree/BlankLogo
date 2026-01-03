@@ -1,11 +1,56 @@
 import Link from "next/link";
-import { Check, Zap, Crown, Rocket, Plus } from "lucide-react";
-import { PRICING_TIERS, CREDIT_PACKS } from "@canvascast/shared";
+import { Check, Zap, Crown, Rocket } from "lucide-react";
+
+const PRICING_TIERS = [
+  {
+    id: "starter",
+    name: "Starter",
+    price: 9,
+    credits: 10,
+    features: [
+      "10 video credits",
+      "All platforms supported",
+      "Crop mode processing",
+      "7-day download links",
+      "Email notifications",
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: 29,
+    credits: 50,
+    popular: true,
+    features: [
+      "50 video credits",
+      "All platforms supported",
+      "Crop + Inpaint modes",
+      "30-day download links",
+      "Priority processing",
+      "Webhook notifications",
+    ],
+  },
+  {
+    id: "business",
+    name: "Business",
+    price: 79,
+    credits: 200,
+    features: [
+      "200 video credits",
+      "All platforms supported",
+      "All processing modes",
+      "90-day download links",
+      "Priority processing",
+      "API access",
+      "Batch processing",
+    ],
+  },
+];
 
 const TIER_ICONS = {
   starter: Zap,
   pro: Crown,
-  creator_plus: Rocket,
+  business: Rocket,
 } as const;
 
 export default function PricingPage() {
@@ -15,8 +60,10 @@ export default function PricingPage() {
       <header className="border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/images/logo-icon.png" alt="CanvasCast" className="w-8 h-8" />
-            <span className="text-xl font-bold">CanvasCast</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold">
+              B
+            </div>
+            <span className="text-xl font-bold">BlankLogo</span>
           </Link>
           <nav className="flex items-center gap-4">
             <Link href="/login" className="text-gray-400 hover:text-white transition">
@@ -24,7 +71,7 @@ export default function PricingPage() {
             </Link>
             <Link
               href="/signup"
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-500 rounded-lg font-medium transition"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition"
             >
               Get Started
             </Link>
@@ -39,7 +86,7 @@ export default function PricingPage() {
             Simple, Credit-Based Pricing
           </h1>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Pay only for what you use. 1 credit = 1 minute of video. 
+            Pay only for what you use. 1 credit = 1 video processed. 
             No subscriptions, no surprises.
           </p>
         </div>
@@ -56,19 +103,19 @@ export default function PricingPage() {
               key={tier.name}
               className={`relative rounded-2xl p-8 ${
                 isPopular
-                  ? "bg-brand-500/10 border-2 border-brand-500"
+                  ? "bg-blue-500/10 border-2 border-blue-500"
                   : "bg-white/5 border border-white/10"
               }`}
             >
               {isPopular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-brand-500 rounded-full text-sm font-medium">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500 rounded-full text-sm font-medium">
                   Most Popular
                 </div>
               )}
 
               <div className="mb-6">
-                <div className="w-12 h-12 rounded-xl bg-brand-500/20 flex items-center justify-center mb-4">
-                  <TierIcon className="w-6 h-6 text-brand-400" />
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4">
+                  <TierIcon className="w-6 h-6 text-blue-400" />
                 </div>
                 <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
                 <div className="flex items-baseline gap-1">
@@ -80,7 +127,7 @@ export default function PricingPage() {
               <ul className="space-y-3 mb-8">
                 {tier.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-brand-400 flex-shrink-0 mt-0.5" />
+                    <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
                     <span className="text-gray-300">{feature}</span>
                   </li>
                 ))}
@@ -90,7 +137,7 @@ export default function PricingPage() {
                 href="/signup"
                 className={`block w-full py-3 rounded-lg font-semibold text-center transition ${
                   isPopular
-                    ? "bg-brand-600 hover:bg-brand-500 text-white"
+                    ? "bg-blue-600 hover:bg-blue-500 text-white"
                     : "bg-white/10 hover:bg-white/20 text-white"
                 }`}
               >
@@ -112,19 +159,19 @@ export default function PricingPage() {
           <div className="space-y-6">
             <FAQItem
               question="How do credits work?"
-              answer="1 credit = 1 minute of generated video. A 10-minute video uses 10 credits. Credits never expire."
+              answer="1 credit = 1 video processed for watermark removal. Credits never expire."
             />
             <FAQItem
-              question="What's included in the output?"
-              answer="Every project includes: final.mp4 (1080p), captions.srt, script.txt, timeline.json, and an assets.zip with all source files."
+              question="What platforms are supported?"
+              answer="BlankLogo supports Sora, TikTok, Runway, Pika, Kling, Luma, Midjourney, and custom watermark positions."
             />
             <FAQItem
-              question="Can I use my own voice?"
-              answer="Yes! With voice cloning, you can upload a 5-30 second voice sample and we'll generate narration in your voice using IndexTTS-2."
+              question="What's the difference between Crop and Inpaint modes?"
+              answer="Crop mode is fast and removes watermarks by trimming video edges. Inpaint mode uses AI to intelligently fill in watermark areas, preserving more of your video."
             />
             <FAQItem
-              question="How long does generation take?"
-              answer="Most videos complete in 5-15 minutes depending on length and queue. You'll get an email when it's ready."
+              question="How long does processing take?"
+              answer="Most videos complete in 15-60 seconds for crop mode, or 2-5 minutes for inpaint mode. You'll get an email when it's ready."
             />
             <FAQItem
               question="Can I get a refund?"
@@ -135,15 +182,15 @@ export default function PricingPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-6 bg-brand-500/10 border-t border-brand-500/20">
+      <section className="py-20 px-6 bg-blue-500/10 border-t border-blue-500/20">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Create?</h2>
+          <h2 className="text-3xl font-bold mb-4">Ready to Remove Watermarks?</h2>
           <p className="text-gray-400 mb-8">
-            Start generating YouTube-ready videos in minutes.
+            Start removing watermarks from your AI-generated videos in seconds.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-brand-600 hover:bg-brand-500 rounded-lg font-semibold text-lg transition"
+            className="inline-block px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-lg transition"
           >
             Get Started Free
           </Link>
@@ -153,7 +200,7 @@ export default function PricingPage() {
       {/* Footer */}
       <footer className="border-t border-white/10 py-8 px-6">
         <div className="max-w-6xl mx-auto text-center text-gray-400 text-sm">
-          © 2026 CanvasCast. All rights reserved.
+          © 2026 BlankLogo. All rights reserved.
         </div>
       </footer>
     </div>

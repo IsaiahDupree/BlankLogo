@@ -4,12 +4,24 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { CreditCard, Check, Loader2, ExternalLink, Zap, Crown, Rocket } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
-import { PRICING_TIERS, CREDIT_PACKS } from "@canvascast/shared";
+
+const PRICING_TIERS = [
+  { id: "starter", name: "Starter", price: 9, credits: 10 },
+  { id: "pro", name: "Pro", price: 29, credits: 50, popular: true },
+  { id: "business", name: "Business", price: 79, credits: 200 },
+];
+
+const CREDIT_PACKS = [
+  { id: "pack_10", credits: 10, price: 9, perCredit: 0.90 },
+  { id: "pack_25", credits: 25, price: 19, perCredit: 0.76 },
+  { id: "pack_50", credits: 50, price: 35, perCredit: 0.70 },
+  { id: "pack_100", credits: 100, price: 59, perCredit: 0.59 },
+];
 
 const TIER_ICONS = {
   starter: Zap,
   pro: Crown,
-  creator_plus: Rocket,
+  business: Rocket,
 } as const;
 
 export default function CreditsPage() {
