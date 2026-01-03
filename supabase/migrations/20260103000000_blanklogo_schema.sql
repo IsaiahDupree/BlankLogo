@@ -1,8 +1,9 @@
 -- BlankLogo Database Schema
 -- Watermark removal service tables
+-- Prefixed with bl_ to avoid conflicts with existing tables
 
 -- Jobs table - stores all watermark removal jobs
-CREATE TABLE IF NOT EXISTS jobs (
+CREATE TABLE IF NOT EXISTS bl_jobs (
     id TEXT PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id),
     batch_id TEXT,
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     crop_pixels INTEGER DEFAULT 100,
     crop_position TEXT DEFAULT 'bottom' CHECK (crop_position IN ('top', 'bottom', 'left', 'right')),
     platform TEXT DEFAULT 'custom',
+    processing_mode TEXT DEFAULT 'crop' CHECK (processing_mode IN ('crop', 'inpaint', 'auto')),
     
     -- Output
     output_url TEXT,
@@ -41,7 +43,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 -- Users table (extends Supabase auth)
-CREATE TABLE IF NOT EXISTS user_profiles (
+CREATE TABLE IF NOT EXISTS bl_user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT UNIQUE,
     api_key TEXT UNIQUE,
@@ -54,17 +56,17 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 
 -- Usage tracking
-CREATE TABLE IF NOT EXISTS usage_logs (
+CREATE TABLE IF NOT EXISTS bl_usage_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id),
-    job_id TEXT REFERENCES jobs(id),
+    job_id TEXT REFERENCES bl_jobs(id),
     action TEXT,
     credits_used INTEGER DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Platform presets (for admin configuration)
-CREATE TABLE IF NOT EXISTS platform_presets (
+CREATE TABLE IF NOT EXISTS bl_platform_presets (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS platform_presets (
 );
 
 -- Insert default platform presets
-INSERT INTO platform_presets (id, name, description, crop_pixels, crop_position) VALUES
+INSERT INTO bl_platform_presets (id, name, description, crop_pixels, crop_position) VALUES
     ('sora', 'Sora', 'OpenAI Sora text-to-video', 100, 'bottom'),
     ('tiktok', 'TikTok', 'TikTok video watermarks', 80, 'bottom'),
     ('runway', 'Runway', 'Runway Gen-2 videos', 60, 'bottom'),
@@ -87,106 +89,116 @@ INSERT INTO platform_presets (id, name, description, crop_pixels, crop_position)
 ON CONFLICT (id) DO NOTHING;
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
-CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
-CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_jobs_batch_id ON jobs(batch_id);
-CREATE INDEX IF NOT EXISTS idx_jobs_platform ON jobs(platform);
-CREATE INDEX IF NOT EXISTS idx_user_profiles_api_key ON user_profiles(api_key);
-CREATE INDEX IF NOT EXISTS idx_usage_logs_user_id ON usage_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_usage_logs_created_at ON usage_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bl_jobs_user_id ON bl_jobs(user_id);
+CREATE INDEX IF NOT EXISTS idx_bl_jobs_status ON bl_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_bl_jobs_created_at ON bl_jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bl_jobs_batch_id ON bl_jobs(batch_id);
+CREATE INDEX IF NOT EXISTS idx_bl_jobs_platform ON bl_jobs(platform);
+CREATE INDEX IF NOT EXISTS idx_bl_user_profiles_api_key ON bl_user_profiles(api_key);
+CREATE INDEX IF NOT EXISTS idx_bl_usage_logs_user_id ON bl_usage_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_bl_usage_logs_created_at ON bl_usage_logs(created_at DESC);
 
 -- RLS Policies
-ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE usage_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bl_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bl_user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bl_usage_logs ENABLE ROW LEVEL SECURITY;
 
 -- Jobs: Users can only see their own jobs
-CREATE POLICY "Users can view own jobs" ON jobs
+CREATE POLICY "bl_users_view_own_jobs" ON bl_jobs
     FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can create own jobs" ON jobs
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "bl_users_create_own_jobs" ON bl_jobs
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR auth.role() = 'service_role');
 
-CREATE POLICY "Users can update own jobs" ON jobs
-    FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "bl_users_update_own_jobs" ON bl_jobs
+    FOR UPDATE USING (auth.uid() = user_id OR auth.role() = 'service_role');
+
+-- Service role can do everything on bl_jobs
+CREATE POLICY "bl_service_role_all_jobs" ON bl_jobs
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- User profiles: Users can only see/update their own profile
-CREATE POLICY "Users can view own profile" ON user_profiles
+CREATE POLICY "bl_users_view_own_profile" ON bl_user_profiles
     FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Users can update own profile" ON user_profiles
+CREATE POLICY "bl_users_update_own_profile" ON bl_user_profiles
     FOR UPDATE USING (auth.uid() = id);
 
 -- Usage logs: Users can only see their own usage
-CREATE POLICY "Users can view own usage" ON usage_logs
+CREATE POLICY "bl_users_view_own_usage" ON bl_usage_logs
     FOR SELECT USING (auth.uid() = user_id);
 
--- Function to generate API key
-CREATE OR REPLACE FUNCTION generate_api_key()
+-- Function to generate BlankLogo API key
+CREATE OR REPLACE FUNCTION bl_generate_api_key()
 RETURNS TEXT AS $$
 BEGIN
     RETURN 'bl_' || encode(gen_random_bytes(24), 'hex');
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to create user profile on signup
-CREATE OR REPLACE FUNCTION handle_new_user()
+-- Function to create user profile on signup (BlankLogo specific)
+CREATE OR REPLACE FUNCTION bl_handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO user_profiles (id, email, api_key)
-    VALUES (NEW.id, NEW.email, generate_api_key());
+    INSERT INTO bl_user_profiles (id, email, api_key)
+    VALUES (NEW.id, NEW.email, bl_generate_api_key())
+    ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to create profile on user signup
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
+-- Trigger to create BlankLogo profile on user signup
+DROP TRIGGER IF EXISTS bl_on_auth_user_created ON auth.users;
+CREATE TRIGGER bl_on_auth_user_created
     AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+    FOR EACH ROW EXECUTE FUNCTION bl_handle_new_user();
 
--- Function to decrement credits on job creation
-CREATE OR REPLACE FUNCTION decrement_user_credits()
+-- Function to decrement credits on BlankLogo job creation
+CREATE OR REPLACE FUNCTION bl_decrement_user_credits()
 RETURNS TRIGGER AS $$
 BEGIN
-    UPDATE user_profiles
+    UPDATE bl_user_profiles
     SET credits_remaining = credits_remaining - 1,
         credits_used_total = credits_used_total + 1,
         updated_at = NOW()
     WHERE id = NEW.user_id
     AND credits_remaining > 0;
     
-    IF NOT FOUND THEN
+    IF NOT FOUND AND NEW.user_id IS NOT NULL THEN
         RAISE EXCEPTION 'Insufficient credits';
     END IF;
     
-    INSERT INTO usage_logs (user_id, job_id, action, credits_used)
-    VALUES (NEW.user_id, NEW.id, 'job_created', 1);
+    IF NEW.user_id IS NOT NULL THEN
+        INSERT INTO bl_usage_logs (user_id, job_id, action, credits_used)
+        VALUES (NEW.user_id, NEW.id, 'job_created', 1);
+    END IF;
     
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to decrement credits when job is created
-DROP TRIGGER IF EXISTS on_job_created ON jobs;
-CREATE TRIGGER on_job_created
-    AFTER INSERT ON jobs
+-- Trigger to decrement credits when BlankLogo job is created
+DROP TRIGGER IF EXISTS bl_on_job_created ON bl_jobs;
+CREATE TRIGGER bl_on_job_created
+    AFTER INSERT ON bl_jobs
     FOR EACH ROW
     WHEN (NEW.user_id IS NOT NULL)
-    EXECUTE FUNCTION decrement_user_credits();
+    EXECUTE FUNCTION bl_decrement_user_credits();
 
--- Storage bucket for videos
+-- Storage bucket for videos (BlankLogo)
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('videos', 'videos', true)
+VALUES ('bl_videos', 'bl_videos', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies
-CREATE POLICY "Public read access" ON storage.objects
-    FOR SELECT USING (bucket_id = 'videos');
+-- Storage policies for BlankLogo videos
+DROP POLICY IF EXISTS "bl_public_read_access" ON storage.objects;
+CREATE POLICY "bl_public_read_access" ON storage.objects
+    FOR SELECT USING (bucket_id = 'bl_videos');
 
-CREATE POLICY "Authenticated upload" ON storage.objects
-    FOR INSERT WITH CHECK (bucket_id = 'videos' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "bl_authenticated_upload" ON storage.objects;
+CREATE POLICY "bl_authenticated_upload" ON storage.objects
+    FOR INSERT WITH CHECK (bucket_id = 'bl_videos');
 
-CREATE POLICY "Service role full access" ON storage.objects
-    FOR ALL USING (bucket_id = 'videos' AND auth.role() = 'service_role');
+DROP POLICY IF EXISTS "bl_service_role_full_access" ON storage.objects;
+CREATE POLICY "bl_service_role_full_access" ON storage.objects
+    FOR ALL USING (bucket_id = 'bl_videos' AND auth.role() = 'service_role');

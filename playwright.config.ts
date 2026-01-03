@@ -7,6 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [["html", { open: "never" }], ["list"]],
+  timeout: 60000,
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:3838",
     trace: "on-first-retry",
@@ -18,11 +19,26 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "api",
+      testMatch: /.*\.api\.spec\.ts/,
+      use: {
+        baseURL: process.env.API_URL || "http://localhost:8080",
+      },
+    },
   ],
-  webServer: {
-    command: "pnpm --filter @canvascast/web dev",
-    url: "http://localhost:3838",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  webServer: process.env.SKIP_WEBSERVER ? undefined : [
+    {
+      command: "pnpm --filter @blanklogo/web dev",
+      url: "http://localhost:3838",
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: "pnpm --filter @blanklogo/api dev",
+      url: "http://localhost:8080/health",
+      reuseExistingServer: true,
+      timeout: 60000,
+    },
+  ],
 });

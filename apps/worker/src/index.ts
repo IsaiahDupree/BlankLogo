@@ -205,7 +205,7 @@ async function uploadToStorage(filePath: string, jobId: string, filename: string
   const storagePath = `processed/${jobId}/${filename}`;
 
   const { error } = await supabase.storage
-    .from("videos")
+    .from("bl_videos")
     .upload(storagePath, fileBuffer, {
       contentType: "video/mp4",
       upsert: true,
@@ -213,7 +213,7 @@ async function uploadToStorage(filePath: string, jobId: string, filename: string
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
-  const { data } = supabase.storage.from("videos").getPublicUrl(storagePath);
+  const { data } = supabase.storage.from("bl_videos").getPublicUrl(storagePath);
   return data.publicUrl;
 }
 
@@ -238,7 +238,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
 
   // Update status to processing
   await supabase
-    .from("jobs")
+    .from("bl_jobs")
     .update({ status: "processing", started_at: new Date().toISOString() })
     .eq("id", jobId);
 
@@ -259,7 +259,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
 
     // Update input info in database
     await supabase
-      .from("jobs")
+      .from("bl_jobs")
       .update({
         input_size_bytes: inputSize,
         input_duration_sec: videoInfo.duration,
@@ -280,7 +280,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
 
     // Update job as completed
     await supabase
-      .from("jobs")
+      .from("bl_jobs")
       .update({
         status: "completed",
         output_url: outputUrl,
@@ -309,7 +309,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
     console.error(`[Worker] Job ${jobId} failed:`, errorMessage);
 
     await supabase
-      .from("jobs")
+      .from("bl_jobs")
       .update({
         status: "failed",
         error_message: errorMessage,

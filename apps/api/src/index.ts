@@ -151,7 +151,7 @@ app.post('/api/v1/jobs', async (req, res) => {
     await jobQueue.add('remove-watermark', jobData, { jobId });
 
     // Store job in database
-    await supabase.from('jobs').insert({
+    await supabase.from('bl_jobs').insert({
       id: jobId,
       status: 'queued',
       input_url: video_url,
@@ -227,7 +227,7 @@ app.post('/api/v1/jobs/upload', upload.single('video'), async (req, res) => {
     await jobQueue.add('remove-watermark', jobData, { jobId });
 
     // Store job in database
-    await supabase.from('jobs').insert({
+    await supabase.from('bl_jobs').insert({
       id: jobId,
       status: 'queued',
       input_url: urlData.publicUrl,
@@ -259,7 +259,7 @@ app.get('/api/v1/jobs/:jobId', async (req, res) => {
     const { jobId } = req.params;
 
     const { data: job, error } = await supabase
-      .from('jobs')
+      .from('bl_jobs')
       .select('*')
       .eq('id', jobId)
       .single();
@@ -308,7 +308,7 @@ app.get('/api/v1/jobs/:jobId/download', async (req, res) => {
     const { jobId } = req.params;
 
     const { data: job, error } = await supabase
-      .from('jobs')
+      .from('bl_jobs')
       .select('*')
       .eq('id', jobId)
       .single();
@@ -370,7 +370,7 @@ app.post('/api/v1/jobs/batch', async (req, res) => {
 
       await jobQueue.add('remove-watermark', jobData, { jobId });
 
-      await supabase.from('jobs').insert({
+      await supabase.from('bl_jobs').insert({
         id: jobId,
         batch_id: batchId,
         status: 'queued',
@@ -411,7 +411,7 @@ app.delete('/api/v1/jobs/:jobId', async (req, res) => {
 
     // Update database
     await supabase
-      .from('jobs')
+      .from('bl_jobs')
       .update({ status: 'cancelled' })
       .eq('id', jobId);
 
