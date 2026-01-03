@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { CreditCard, Check, Loader2, ExternalLink, Zap, Crown, Rocket } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+import { useToast } from "@/components/toast";
 
 // Logging utility
 function logCredits(message: string, data?: unknown) {
@@ -38,12 +39,19 @@ export default function CreditsPage() {
 
   const success = searchParams.get("success");
   const canceled = searchParams.get("canceled");
+  const toast = useToast();
 
   useEffect(() => {
     logCredits("💳 Credits page loaded");
-    if (success) logCredits("✅ Payment success detected");
-    if (canceled) logCredits("⚠️ Payment canceled detected");
-  }, [success, canceled]);
+    if (success) {
+      logCredits("✅ Payment success detected");
+      toast.success("Payment successful! Credits added to your account.");
+    }
+    if (canceled) {
+      logCredits("⚠️ Payment canceled detected");
+      toast.warning("Payment was canceled.");
+    }
+  }, [success, canceled, toast]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -113,6 +121,7 @@ export default function CreditsPage() {
       }
     } catch (err) {
       logCredits("❌ Checkout failed:", err);
+      toast.error("Failed to start checkout. Please try again.");
     } finally {
       setPurchasing(null);
     }

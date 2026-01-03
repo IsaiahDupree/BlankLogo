@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+import { useToast } from "@/components/toast";
 
 // Logging utility
 function logRemove(message: string, data?: unknown) {
@@ -31,6 +32,7 @@ export default function RemoveWatermarkPage() {
   const [success, setSuccess] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const router = useRouter();
+  const toast = useToast();
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -134,7 +136,9 @@ export default function RemoveWatermarkPage() {
       }
     } catch (err) {
       logRemove("❌ Error:", err);
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

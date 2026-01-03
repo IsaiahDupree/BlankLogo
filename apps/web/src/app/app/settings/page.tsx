@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, Mail, Loader2, CheckCircle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+import { useToast } from "@/components/toast";
 
 // Logging utility
 function logSettings(message: string, data?: unknown) {
@@ -32,6 +33,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const toast = useToast();
 
   useEffect(() => {
     logSettings("⚙️ Settings page loaded");
@@ -109,9 +112,11 @@ export default function SettingsPage() {
 
       logSettings("✅ Preferences saved successfully");
       setSaved(true);
+      toast.success("Preferences saved successfully!");
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       logSettings("❌ Failed to save preferences:", err);
+      toast.error("Failed to save preferences. Please try again.");
     } finally {
       setSaving(false);
     }
