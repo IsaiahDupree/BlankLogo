@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: [["html", { open: "never" }], ["list"]],
   timeout: 60000,
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:3838",
+    baseURL: process.env.BASE_URL || "http://localhost:3939",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: process.env.SKIP_WEBSERVER ? undefined : [
     {
       command: "pnpm --filter @blanklogo/web dev",
-      url: "http://localhost:3838",
+      url: "http://localhost:3939",
       reuseExistingServer: true,
       timeout: 120000,
     },
