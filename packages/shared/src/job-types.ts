@@ -61,6 +61,9 @@ export type Platform =
   | "kling"
   | "luma"
   | "midjourney"
+  | "instagram"
+  | "facebook"
+  | "meta"
   | "custom";
 
 // Watermark Position
@@ -275,6 +278,9 @@ export const PLATFORM_PRESETS: Record<Platform, { cropPixels: number; position: 
   kling: { cropPixels: 70, position: { location: "bottom-right" } },
   luma: { cropPixels: 55, position: { location: "bottom-left" } },
   midjourney: { cropPixels: 0, position: { location: "bottom-left" } },
+  instagram: { cropPixels: 0, position: { location: "bottom-right" } },  // Meta/Instagram Reels
+  facebook: { cropPixels: 0, position: { location: "bottom-right" } },   // Meta/Facebook Videos
+  meta: { cropPixels: 0, position: { location: "bottom-right" } },       // Generic Meta watermarks
   custom: { cropPixels: 0, position: { location: "custom" } },
 };
 

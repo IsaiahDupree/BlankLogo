@@ -18,6 +18,8 @@ const PLATFORMS = [
   { id: "pika", name: "Pika", cropPixels: 50, color: "from-orange-500 to-red-500", description: "Pika Labs" },
   { id: "kling", name: "Kling", cropPixels: 70, color: "from-blue-500 to-indigo-500", description: "Kling AI" },
   { id: "luma", name: "Luma", cropPixels: 55, color: "from-yellow-500 to-orange-500", description: "Luma Dream Machine" },
+  { id: "instagram", name: "Instagram", cropPixels: 0, color: "from-pink-500 to-purple-600", description: "Meta Reels watermarks" },
+  { id: "facebook", name: "Facebook", cropPixels: 0, color: "from-blue-600 to-blue-800", description: "Meta video watermarks" },
   { id: "custom", name: "Custom", cropPixels: 0, color: "from-gray-500 to-gray-600", description: "Set custom crop" },
 ];
 

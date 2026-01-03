@@ -454,6 +454,9 @@ const PLATFORM_PRESETS: Record<string, { cropPixels: number; cropPosition: 'bott
   midjourney: { cropPixels: 40, cropPosition: 'bottom' },
   kling: { cropPixels: 70, cropPosition: 'bottom' },
   luma: { cropPixels: 55, cropPosition: 'bottom' },
+  instagram: { cropPixels: 0, cropPosition: 'bottom' },  // Meta/Instagram Reels
+  facebook: { cropPixels: 0, cropPosition: 'bottom' },   // Meta/Facebook Videos
+  meta: { cropPixels: 0, cropPosition: 'bottom' },       // Generic Meta watermarks
   custom: { cropPixels: 100, cropPosition: 'bottom' },
 };
 
