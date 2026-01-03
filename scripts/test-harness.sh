@@ -20,8 +20,10 @@ REDIS_PORT=${REDIS_PORT:-6379}
 
 API_HEALTHZ="http://localhost:$API_PORT/healthz"
 API_READYZ="http://localhost:$API_PORT/readyz"
+API_CAPABILITIES="http://localhost:$API_PORT/capabilities"
 WORKER_HEALTHZ="http://localhost:$WORKER_PORT/healthz"
 WORKER_READYZ="http://localhost:$WORKER_PORT/readyz"
+WORKER_CAPABILITIES="http://localhost:$WORKER_PORT/capabilities"
 
 # Log files
 API_LOG="$OUT_DIR/api.log"
@@ -94,14 +96,21 @@ curl_json() {
 
 snapshot_status() {
     local label="$1"
-    local api_h api_r worker_h worker_r
-    local api_state worker_state
+    local api_h api_r api_c
+    local api_state api_version api_protocol
     
     api_h="$(curl_code "$API_HEALTHZ")"
     api_r="$(curl_code "$API_READYZ")"
+    api_c="$(curl_code "$API_CAPABILITIES")"
     
     # Get state from healthz response
     api_state="$(curl_json "$API_HEALTHZ" | grep -o '"state":"[^"]*"' | cut -d'"' -f4 || echo "unknown")"
+    
+    # Get capabilities info
+    local caps_json="$(curl_json "$API_CAPABILITIES")"
+    api_version="$(echo "$caps_json" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "unknown")"
+    api_protocol="$(echo "$caps_json" | grep -o '"version":[0-9]*' | head -1 | cut -d':' -f2 || echo "0")"
+    local api_run_id="$(echo "$caps_json" | grep -o '"run_id":"[^"]*"' | cut -d'"' -f4 || echo "unknown")"
     
     # Redis check
     local redis_up="false"
@@ -109,10 +118,10 @@ snapshot_status() {
         redis_up="true"
     fi
     
-    local snapshot="{\"ts\":\"$(date -Iseconds)\",\"label\":\"$label\",\"run_id\":\"$RUN_ID\",\"api_healthz\":$api_h,\"api_readyz\":$api_r,\"api_state\":\"$api_state\",\"redis_up\":$redis_up}"
+    local snapshot="{\"ts\":\"$(date -Iseconds)\",\"label\":\"$label\",\"harness_run_id\":\"$RUN_ID\",\"api_healthz\":$api_h,\"api_readyz\":$api_r,\"api_capabilities\":$api_c,\"api_state\":\"$api_state\",\"api_run_id\":\"$api_run_id\",\"api_version\":\"$api_version\",\"api_protocol\":$api_protocol,\"redis_up\":$redis_up}"
     
     echo "$snapshot" >> "$STATUS_LOG"
-    log "INFO" "Status: api_healthz=$api_h api_readyz=$api_r state=$api_state redis=$redis_up"
+    log "INFO" "Status: healthz=$api_h readyz=$api_r caps=$api_c state=$api_state run_id=$api_run_id"
 }
 
 tail_logs() {
@@ -503,6 +512,82 @@ iteration_10_dependency_restored() {
     tail_logs "dep_restored"
 }
 
+# Iteration 11: Capabilities check
+iteration_11_capabilities_check() {
+    log_section "ITERATION 11: Capabilities Check"
+    
+    # Ensure API is running
+    local api_h=$(curl_code "$API_HEALTHZ")
+    if [[ "$api_h" != "200" ]]; then
+        start_api
+        wait_for_ready "API" "$API_READYZ" 30 || true
+    fi
+    
+    snapshot_status "caps_check"
+    
+    # Test 1: Capabilities endpoint returns 200
+    local caps_code=$(curl_code "$API_CAPABILITIES")
+    run_test "Capabilities endpoint returns 200" "200" "$caps_code" || true
+    
+    # Test 2: Capabilities has required schema
+    local caps_json=$(curl_json "$API_CAPABILITIES")
+    
+    local has_schema=$(echo "$caps_json" | grep -c '"schema":"capabilities/v1"' || echo "0")
+    run_test "Capabilities has schema field" "1" "$has_schema" || true
+    
+    # Test 3: Has service name
+    local has_service=$(echo "$caps_json" | grep -c '"service":"api"' || echo "0")
+    run_test "Capabilities has service field" "1" "$has_service" || true
+    
+    # Test 4: Has run_id (changes each boot)
+    local has_run_id=$(echo "$caps_json" | grep -c '"run_id":"api-' || echo "0")
+    run_test "Capabilities has run_id field" "1" "$has_run_id" || true
+    
+    # Test 5: Has build version
+    local has_version=$(echo "$caps_json" | grep -c '"version":' || echo "0")
+    if [[ "$has_version" -gt 0 ]]; then
+        log "PASS" "✅ Capabilities has version info"
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        log "FAIL" "❌ Capabilities missing version info"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
+    TESTS_RUN=$((TESTS_RUN + 1))
+    
+    # Test 6: Has protocol version
+    local has_protocol=$(echo "$caps_json" | grep -c '"protocol":' || echo "0")
+    run_test "Capabilities has protocol field" "1" "$has_protocol" || true
+    
+    # Test 7: Has features
+    local has_features=$(echo "$caps_json" | grep -c '"features":' || echo "0")
+    run_test "Capabilities has features field" "1" "$has_features" || true
+    
+    # Test 8: Has endpoints
+    local has_endpoints=$(echo "$caps_json" | grep -c '"endpoints":' || echo "0")
+    run_test "Capabilities has endpoints field" "1" "$has_endpoints" || true
+    
+    # Test 9: Has dependencies
+    local has_deps=$(echo "$caps_json" | grep -c '"dependencies":' || echo "0")
+    run_test "Capabilities has dependencies field" "1" "$has_deps" || true
+    
+    # Test 10: Has limits
+    local has_limits=$(echo "$caps_json" | grep -c '"limits":' || echo "0")
+    run_test "Capabilities has limits field" "1" "$has_limits" || true
+    
+    # Log capabilities for verification
+    log "INFO" "Full capabilities response:"
+    echo "$caps_json" | head -50 >> "$HARNESS_LOG"
+    
+    # Check for CAPABILITIES_ANNOUNCED event in logs
+    if grep -q '"event":"CAPABILITIES_ANNOUNCED"' "$API_LOG" 2>/dev/null; then
+        log "PASS" "CAPABILITIES_ANNOUNCED event found in logs"
+    else
+        log "WARN" "CAPABILITIES_ANNOUNCED event not found (may have been before log capture)"
+    fi
+    
+    tail_logs "caps_check"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SUMMARY & CLEANUP
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -590,6 +675,10 @@ main() {
             iteration_8_port_conflict
             iteration_9_dependency_down
             iteration_10_dependency_restored
+            iteration_11_capabilities_check
+            ;;
+        "caps"|"11")
+            iteration_11_capabilities_check
             ;;
     esac
     

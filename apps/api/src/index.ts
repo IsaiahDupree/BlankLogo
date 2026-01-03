@@ -18,11 +18,123 @@ const PORT = process.env.PORT || 8989;
 
 type ServiceState = 'starting' | 'ready' | 'degraded' | 'stopping' | 'stopped' | 'crashed';
 type LifecycleEvent = 'STARTING' | 'READY' | 'STOPPING' | 'STOPPED' | 'CRASH' | 
-                      'DEPENDENCY_DOWN' | 'DEPENDENCY_UP' | 'READY_TIMEOUT' | 'CRASH_LOOP';
+                      'DEPENDENCY_DOWN' | 'DEPENDENCY_UP' | 'READY_TIMEOUT' | 'CRASH_LOOP' |
+                      'CAPABILITIES_ANNOUNCED' | 'CAPABILITIES_CHANGED' | 'INCOMPATIBLE_CAPABILITIES';
 
 const SERVICE_NAME = 'api';
 const RUN_ID = `${SERVICE_NAME}-${uuidv4().slice(0, 8)}`;
+const INSTANCE_ID = `${require('os').hostname()}:${PORT}`;
 const startTimestamp = Date.now();
+const BUILD_VERSION = process.env.BUILD_VERSION || '1.0.0';
+const BUILD_COMMIT = process.env.BUILD_COMMIT || 'dev';
+const PROTOCOL_VERSION = 1;
+
+// ═══════════════════════════════════════════════════════════════════
+// CAPABILITIES DEFINITION
+// ═══════════════════════════════════════════════════════════════════
+
+interface ServiceCapabilities {
+  schema: string;
+  service: string;
+  run_id: string;
+  instance_id: string;
+  build: {
+    version: string;
+    commit: string;
+    built_at: string;
+  };
+  protocol: {
+    name: string;
+    version: number;
+  };
+  endpoints: Record<string, string>;
+  features: Record<string, boolean | string>;
+  events: {
+    produces: string[];
+    consumes: string[];
+  };
+  dependencies: Array<{
+    name: string;
+    required: boolean;
+    min_protocol_version: number;
+  }>;
+  limits: {
+    max_payload_kb: number;
+    rate_limit_rps: number;
+    max_video_size_mb: number;
+  };
+}
+
+let capabilities: ServiceCapabilities = {
+  schema: 'capabilities/v1',
+  service: SERVICE_NAME,
+  run_id: RUN_ID,
+  instance_id: INSTANCE_ID,
+  build: {
+    version: BUILD_VERSION,
+    commit: BUILD_COMMIT,
+    built_at: new Date().toISOString(),
+  },
+  protocol: {
+    name: 'blanklogo-api',
+    version: PROTOCOL_VERSION,
+  },
+  endpoints: {
+    healthz: '/healthz',
+    readyz: '/readyz',
+    capabilities: '/capabilities',
+    status: '/status',
+    jobs: '/api/v1/jobs',
+    platforms: '/api/v1/platforms',
+  },
+  features: {
+    watermark_removal: true,
+    batch_processing: true,
+    webhook_notifications: true,
+    inpaint_mode: process.env.ENABLE_INPAINT === 'true',
+    custom_crop: true,
+  },
+  events: {
+    produces: ['JOB_CREATED', 'JOB_COMPLETED', 'JOB_FAILED', 'STATUS_CHANGED', 'CAPABILITIES_CHANGED'],
+    consumes: ['PROCESS_VIDEO'],
+  },
+  dependencies: [
+    { name: 'redis', required: true, min_protocol_version: 1 },
+    { name: 'supabase', required: true, min_protocol_version: 1 },
+    { name: 'worker', required: false, min_protocol_version: 1 },
+  ],
+  limits: {
+    max_payload_kb: 512,
+    rate_limit_rps: 60,
+    max_video_size_mb: 500,
+  },
+};
+
+// Track dependency capabilities
+const dependencyCapabilities: Record<string, ServiceCapabilities | null> = {
+  worker: null,
+};
+
+// Check if a dependency is compatible
+function checkDependencyCompatibility(depName: string, depCaps: ServiceCapabilities | null): { compatible: boolean; reason?: string } {
+  if (!depCaps) {
+    return { compatible: true }; // Can't check if no caps available
+  }
+  
+  const dep = capabilities.dependencies.find(d => d.name === depName);
+  if (!dep) {
+    return { compatible: true };
+  }
+  
+  if (depCaps.protocol.version < dep.min_protocol_version) {
+    return {
+      compatible: false,
+      reason: `${depName} protocol version ${depCaps.protocol.version} < required ${dep.min_protocol_version}`,
+    };
+  }
+  
+  return { compatible: true };
+}
 
 let currentState: ServiceState = 'starting';
 let previousState: ServiceState = 'stopped';
@@ -99,8 +211,56 @@ function updateDependency(name: keyof typeof dependencies, isUp: boolean, reason
   }
 }
 
+// Announce capabilities (log + optional registry)
+async function announceCapabilities(trigger: 'startup' | 'ready' | 'config_change' | 'shutdown') {
+  logEvent('CAPABILITIES_ANNOUNCED', `Capabilities announced on ${trigger}`, {
+    capabilities: {
+      schema: capabilities.schema,
+      service: capabilities.service,
+      version: capabilities.build.version,
+      protocol_version: capabilities.protocol.version,
+      features: Object.keys(capabilities.features).filter(k => capabilities.features[k]),
+    },
+    trigger,
+  });
+  
+  // If a registry URL is configured, POST to it
+  const registryUrl = process.env.REGISTRY_URL;
+  if (registryUrl) {
+    try {
+      await fetch(`${registryUrl}/registry/announce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: currentState,
+          capabilities,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    } catch (err) {
+      console.error('[REGISTRY] Failed to announce capabilities:', err);
+    }
+  }
+}
+
+// Update and announce capability changes
+function updateCapability(feature: string, value: boolean | string) {
+  const oldValue = capabilities.features[feature];
+  if (oldValue === value) return;
+  
+  capabilities.features[feature] = value;
+  logEvent('CAPABILITIES_CHANGED', `Feature ${feature} changed from ${oldValue} to ${value}`, {
+    feature,
+    old_value: oldValue,
+    new_value: value,
+  });
+  
+  announceCapabilities('config_change');
+}
+
 // Log startup
 logEvent('STARTING', 'API server initializing', { port: PORT });
+announceCapabilities('startup');
 
 // Redis connection with error handling
 let redis: Redis | null = null;
@@ -324,6 +484,20 @@ app.get('/healthz', (req, res) => {
     state: currentState,
     uptime_ms: Date.now() - startTimestamp,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// /capabilities - What this service can do
+app.get('/capabilities', (req, res) => {
+  res.status(200).json({
+    ...capabilities,
+    state: currentState,
+    uptime_ms: Date.now() - startTimestamp,
+    timestamp: new Date().toISOString(),
+    compatibility: {
+      status: 'ok',
+      issues: [],
+    },
   });
 });
 

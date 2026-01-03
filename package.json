@@ -57,7 +57,8 @@
     "test:harness:quick": "bash scripts/test-harness.sh quick",
     "test:harness:baseline": "bash scripts/test-harness.sh baseline",
     "test:harness:crash": "bash scripts/test-harness.sh crash",
-    "test:harness:depdown": "bash scripts/test-harness.sh depdown"
+    "test:harness:depdown": "bash scripts/test-harness.sh depdown",
+    "test:harness:caps": "bash scripts/test-harness.sh caps"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
