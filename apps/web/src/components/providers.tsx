@@ -3,11 +3,14 @@
 import { ReactNode } from "react";
 import { ToastProvider } from "./toast";
 import ErrorBoundary from "./error-boundary";
+import { MetaPixelProvider } from "./meta-pixel-provider";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ErrorBoundary>
-      <ToastProvider>{children}</ToastProvider>
+      <MetaPixelProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </MetaPixelProvider>
     </ErrorBoundary>
   );
 }

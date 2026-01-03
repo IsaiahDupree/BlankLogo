@@ -5,6 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { CreditCard, Check, Loader2, ExternalLink, Zap, Crown, Rocket } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
+import { 
+  trackViewContent, 
+  trackSelectCreditPack, 
+  trackStartCheckout, 
+  trackCreditPurchase 
+} from "@/lib/meta-pixel";
 
 // Logging utility
 function logCredits(message: string, data?: unknown) {
@@ -43,15 +49,39 @@ export default function CreditsPage() {
 
   useEffect(() => {
     logCredits("💳 Credits page loaded");
+    
+    // Track page view for pricing
+    trackViewContent({
+      contentName: 'Credits Page',
+      contentCategory: 'pricing',
+    });
+    
     if (success) {
       logCredits("✅ Payment success detected");
       toast.success("Payment successful! Credits added to your account.");
+      
+      // Track purchase event (get details from URL if available)
+      const packId = searchParams.get("pack_id") || "unknown";
+      const packName = searchParams.get("pack_name") || "Credit Pack";
+      const price = parseFloat(searchParams.get("amount") || "0");
+      const credits = parseInt(searchParams.get("credits") || "0", 10);
+      
+      if (price > 0) {
+        trackCreditPurchase({
+          packId,
+          packName,
+          price,
+          credits,
+          orderId: searchParams.get("session_id") || undefined,
+        });
+        logCredits("📊 Meta Purchase event tracked", { packId, price, credits });
+      }
     }
     if (canceled) {
       logCredits("⚠️ Payment canceled detected");
       toast.warning("Payment was canceled.");
     }
-  }, [success, canceled, toast]);
+  }, [success, canceled, toast, searchParams]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -98,6 +128,26 @@ export default function CreditsPage() {
   async function handlePurchase(packId: string, isSubscription: boolean = false) {
     logCredits("🛒 Purchase initiated:", { packId, isSubscription });
     setPurchasing(packId);
+
+    // Find pack details for Meta tracking
+    const pack = CREDIT_PACKS.find(p => p.id === packId);
+    if (pack) {
+      // Track Add to Cart
+      trackSelectCreditPack({
+        packName: `${pack.credits} Credits`,
+        packId: pack.id,
+        price: pack.price,
+        credits: pack.credits,
+      });
+      
+      // Track Initiate Checkout
+      trackStartCheckout({
+        packId: pack.id,
+        price: pack.price,
+        credits: pack.credits,
+      });
+      logCredits("📊 Meta AddToCart + InitiateCheckout tracked", { packId, price: pack.price });
+    }
 
     try {
       logCredits("⏳ Creating checkout session...");
