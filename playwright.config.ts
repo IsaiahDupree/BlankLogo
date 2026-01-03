@@ -23,7 +23,7 @@ export default defineConfig({
       name: "api",
       testMatch: /.*\.api\.spec\.ts/,
       use: {
-        baseURL: process.env.API_URL || "http://localhost:8080",
+        baseURL: process.env.API_URL || "http://localhost:8989",
       },
     },
   ],
@@ -36,7 +36,7 @@ export default defineConfig({
     },
     {
       command: "pnpm --filter @blanklogo/api dev",
-      url: "http://localhost:8080/health",
+      url: "http://localhost:8989/health",
       reuseExistingServer: true,
       timeout: 60000,
     },

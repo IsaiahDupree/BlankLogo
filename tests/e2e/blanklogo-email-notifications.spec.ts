@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
 // Tests for job completion notifications
 // ============================================
 
-const API_URL = process.env.API_URL || "http://localhost:8080";
+const API_URL = process.env.API_URL || "http://localhost:8989";
 const MAILPIT_URL = process.env.MAILPIT_URL || "http://localhost:8025";
 const TEST_VIDEO_URL = "https://www.w3schools.com/html/mov_bbb.mp4";
 

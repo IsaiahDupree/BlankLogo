@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
 // Full watermark removal flow via API
 // ============================================
 
-const API_URL = process.env.API_URL || "http://localhost:8080";
+const API_URL = process.env.API_URL || "http://localhost:8989";
 const TEST_VIDEO_URL = "https://www.w3schools.com/html/mov_bbb.mp4";
 
 test.describe("API Health & Status", () => {

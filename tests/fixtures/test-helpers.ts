@@ -7,7 +7,7 @@ import { APIRequestContext } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 
-const API_URL = process.env.API_URL || "http://localhost:8080";
+const API_URL = process.env.API_URL || "http://localhost:8989";
 
 export interface JobResult {
   job_id: string;

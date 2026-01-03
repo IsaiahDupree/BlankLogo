@@ -12,7 +12,7 @@ const TEST_USER = {
   password: "TestPassword123!",
 };
 
-const API_URL = process.env.API_URL || "http://localhost:8080";
+const API_URL = process.env.API_URL || "http://localhost:8989";
 
 // Helper to create a small test video file
 async function createTestVideoFile(): Promise<string> {
