@@ -188,10 +188,10 @@ otp_expiry = 3600
 # Use local Inbucket for email testing
 [auth.email.smtp]
 enabled = true
-host = "inbucket"
+host = "supabase_inbucket_BlankLogo"
 port = 1025
-user = "inbucket"
-pass = "inbucket"
+user = "test"
+pass = "test"
 admin_email = "admin@blanklogo.com"
 sender_name = "BlankLogo"
 
