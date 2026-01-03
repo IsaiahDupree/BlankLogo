@@ -21,6 +21,7 @@
     "test:worker": "vitest run tests/worker",
     "test:security": "vitest run tests/security",
     "test:e2e": "playwright test",
+    "test:perf": "playwright test tests/e2e/performance.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:ci": "vitest run --exclude tests/db",
     "test:integration": "vitest run tests/integration",
