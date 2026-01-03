@@ -100,7 +100,7 @@ test_redis() {
         
         # Test 4: Info
         run_test "Redis INFO available" \
-            "redis-cli -p $REDIS_PORT INFO server 2>/dev/null | head -1" \
+            "redis-cli -p $REDIS_PORT INFO server 2>/dev/null | grep -q redis_version && echo 'redis_version'" \
             "redis_version" || true
     else
         log "SKIP" "redis-cli not installed - skipping advanced Redis tests"
