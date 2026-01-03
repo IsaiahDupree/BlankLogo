@@ -235,7 +235,7 @@ export default function PlatformPage({ params }: { params: { platform: string } 
             Ready to Clean Your {platform.name} Videos?
           </h2>
           <p className="text-xl text-white/80 mb-8">
-            Start with 10 free videos. No credit card required.
+            Start with 5 free credits. No credit card required.
           </p>
           <Link
             href="/app"

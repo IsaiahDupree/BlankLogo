@@ -1,14 +1,27 @@
 import Link from "next/link";
-import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { Check, Zap, Crown, Rocket, Gift } from "lucide-react";
 
 const PRICING_TIERS = [
   {
+    id: "free",
+    name: "Free",
+    price: 0,
+    credits: 5,
+    features: [
+      "5 video credits",
+      "All platforms supported",
+      "Crop mode processing",
+      "3-day download links",
+      "No credit card required",
+    ],
+  },
+  {
     id: "starter",
     name: "Starter",
-    price: 9,
-    credits: 10,
+    price: 5,
+    credits: 15,
     features: [
-      "10 video credits",
+      "15 video credits",
       "All platforms supported",
       "Crop mode processing",
       "7-day download links",
@@ -18,11 +31,11 @@ const PRICING_TIERS = [
   {
     id: "pro",
     name: "Pro",
-    price: 29,
-    credits: 50,
+    price: 19,
+    credits: 60,
     popular: true,
     features: [
-      "50 video credits",
+      "60 video credits",
       "All platforms supported",
       "Crop + Inpaint modes",
       "30-day download links",
@@ -33,7 +46,7 @@ const PRICING_TIERS = [
   {
     id: "business",
     name: "Business",
-    price: 79,
+    price: 49,
     credits: 200,
     features: [
       "200 video credits",
@@ -48,6 +61,7 @@ const PRICING_TIERS = [
 ];
 
 const TIER_ICONS = {
+  free: Gift,
   starter: Zap,
   pro: Crown,
   business: Rocket,
@@ -94,7 +108,7 @@ export default function PricingPage() {
 
       {/* Pricing Cards */}
       <section className="py-12 px-6">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PRICING_TIERS.map((tier) => {
             const isPopular = "popular" in tier && tier.popular;
             const TierIcon = TIER_ICONS[tier.id as keyof typeof TIER_ICONS];
@@ -119,9 +133,16 @@ export default function PricingPage() {
                 </div>
                 <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">${tier.price}</span>
+                  <span className="text-4xl font-bold">
+                    {tier.price === 0 ? "Free" : `$${tier.price}`}
+                  </span>
                   <span className="text-gray-400">/ {tier.credits} credits</span>
                 </div>
+                {tier.price > 0 && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    ${(tier.price / tier.credits).toFixed(2)} per credit
+                  </p>
+                )}
               </div>
 
               <ul className="space-y-3 mb-8">
@@ -138,10 +159,12 @@ export default function PricingPage() {
                 className={`block w-full py-3 rounded-lg font-semibold text-center transition ${
                   isPopular
                     ? "bg-blue-600 hover:bg-blue-500 text-white"
+                    : tier.price === 0
+                    ? "bg-green-600 hover:bg-green-500 text-white"
                     : "bg-white/10 hover:bg-white/20 text-white"
                 }`}
               >
-                Get Started
+                {tier.price === 0 ? "Start Free" : "Get Started"}
               </Link>
             </div>
           );
