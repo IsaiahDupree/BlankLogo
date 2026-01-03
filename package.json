@@ -29,7 +29,10 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:migrate": "supabase db push",
-    "db:studio": "open http://127.0.0.1:54343"
+    "db:studio": "open http://127.0.0.1:54353",
+    "health": "bash scripts/health-check.sh",
+    "health:watch": "watch -n 5 'bash scripts/health-check.sh'",
+    "doctor": "bash scripts/health-check.sh && echo '\\n=== Running Tests ===' && pnpm test:e2e --project=chromium tests/e2e/auth-flows.spec.ts --reporter=list | tail -20"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
