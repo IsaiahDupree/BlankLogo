@@ -33,7 +33,19 @@
     "db:studio": "open http://127.0.0.1:54353",
     "health": "bash scripts/health-check.sh",
     "health:watch": "watch -n 5 'bash scripts/health-check.sh'",
-    "doctor": "bash scripts/health-check.sh && echo '\\n=== Running Tests ===' && pnpm test:e2e --project=chromium tests/e2e/auth-flows.spec.ts --reporter=list | tail -20"
+    "doctor": "bash scripts/health-check.sh && echo '\\n=== Running Tests ===' && pnpm test:e2e --project=chromium tests/e2e/auth-flows.spec.ts --reporter=list | tail -20",
+    "start": "bash scripts/startup.sh",
+    "start:api": "bash scripts/startup.sh api",
+    "start:frontend": "bash scripts/startup.sh frontend",
+    "start:redis": "bash scripts/startup.sh redis",
+    "stop": "bash scripts/shutdown.sh",
+    "stop:force": "bash scripts/shutdown.sh force",
+    "status": "bash scripts/startup.sh status",
+    "test:services": "bash scripts/test-services.sh",
+    "test:redis": "bash scripts/test-services.sh redis",
+    "test:api": "bash scripts/test-services.sh api",
+    "test:frontend": "bash scripts/test-services.sh frontend",
+    "test:inter": "bash scripts/test-services.sh interconnection"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
