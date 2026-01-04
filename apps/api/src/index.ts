@@ -325,7 +325,7 @@ const supabase = createClient(
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3838'],
+  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3939', 'http://localhost:3838', 'http://127.0.0.1:3939'],
   credentials: true,
 }));
 app.use(express.json());
