@@ -15,7 +15,7 @@ services:
     runtime: node
     plan: free
     rootDir: ""
-    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/shared build && pnpm --filter @blanklogo/api build
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/api build
     startCommand: cd apps/api && pnpm start
     healthCheckPath: /health
     envVars:
@@ -41,7 +41,7 @@ services:
     runtime: node
     plan: free
     rootDir: ""
-    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/shared build && pnpm --filter @blanklogo/worker build
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/worker build
     startCommand: cd apps/worker && pnpm start
     healthCheckPath: /health
     envVars:
@@ -67,7 +67,7 @@ services:
     runtime: node
     plan: free
     rootDir: ""
-    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/shared build && pnpm --filter @blanklogo/web build
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/web build
     startCommand: cd apps/web && pnpm start
     envVars:
       - key: NODE_ENV
