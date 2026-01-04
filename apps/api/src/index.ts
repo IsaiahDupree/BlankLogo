@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import os from 'os';
 import { validateVideoUrl } from './utils/urlValidator.js';
+import { jobsRateLimiter, apiRateLimiter } from './middleware/rateLimiter.js';
 
 config();
 
@@ -756,7 +757,7 @@ function calculateCreditsRequired(processingMode: ProcessingMode): number {
 }
 
 // Create a new watermark removal job (requires authentication)
-app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, res) => {
+app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       video_url,
@@ -945,7 +946,7 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
 });
 
 // Upload video file directly (requires authentication)
-app.post('/api/v1/jobs/upload', authenticateToken, upload.single('video'), async (req: AuthenticatedRequest, res) => {
+app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.single('video'), async (req: AuthenticatedRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file provided' });
@@ -1121,7 +1122,7 @@ app.get('/api/v1/jobs/:jobId/download', authenticateToken, async (req: Authentic
 });
 
 // Batch job creation (requires authentication)
-app.post('/api/v1/jobs/batch', authenticateToken, async (req: AuthenticatedRequest, res) => {
+app.post('/api/v1/jobs/batch', authenticateToken, jobsRateLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { videos, crop_pixels, crop_position, platform = 'sora', processing_mode = 'inpaint', webhook_url } = req.body;
 

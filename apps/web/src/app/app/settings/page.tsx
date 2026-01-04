@@ -111,6 +111,21 @@ export default function SettingsPage() {
       }
 
       logSettings("✅ Preferences saved successfully");
+      
+      // Invalidate cache so workers pick up new preferences
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await fetch("/api/settings/invalidate-cache", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          logSettings("✅ Cache invalidated");
+        }
+      } catch (cacheErr) {
+        logSettings("⚠️ Cache invalidation failed (non-critical):", cacheErr);
+      }
+      
       setSaved(true);
       toast.success("Preferences saved successfully!");
       setTimeout(() => setSaved(false), 2000);
