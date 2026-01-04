@@ -13,12 +13,10 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: "npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/api build"
-    startCommand: "node apps/api/dist/index.js"
+    buildCommand: "npm install -g pnpm && pnpm install --prod=false && pnpm --filter @blanklogo/api build"
+    startCommand: "NODE_ENV=production node apps/api/dist/index.js"
     healthCheckPath: /health
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: PORT
         value: 8989
       - key: REDIS_URL
@@ -39,12 +37,10 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: "npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/worker build"
-    startCommand: "node apps/worker/dist/index.js"
+    buildCommand: "npm install -g pnpm && pnpm install --prod=false && pnpm --filter @blanklogo/worker build"
+    startCommand: "NODE_ENV=production node apps/worker/dist/index.js"
     healthCheckPath: /health
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: WORKER_ID
         value: worker-1
       - key: WORKER_CONCURRENCY
