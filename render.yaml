@@ -9,14 +9,13 @@ services:
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
-  # API Server
+  # API Server (Docker)
   - type: web
     name: blanklogo-api
-    runtime: node
+    runtime: docker
     plan: free
-    rootDir: ""
-    buildCommand: npm install -g pnpm && pnpm install && pnpm build:api
-    startCommand: cd apps/api && node dist/index.js
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -35,14 +34,13 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
-  # Background Worker (runs as web service with internal health endpoint)
+  # Background Worker (Docker)
   - type: web
     name: blanklogo-worker
-    runtime: node
+    runtime: docker
     plan: free
-    rootDir: ""
-    buildCommand: npm install -g pnpm && pnpm install && pnpm build:worker
-    startCommand: cd apps/worker && node dist/index.js
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -61,14 +59,13 @@ services:
       - key: SUPABASE_SERVICE_KEY
         sync: false
 
-  # Web App (Next.js)
+  # Web App (Next.js Docker)
   - type: web
     name: blanklogo-web
-    runtime: node
+    runtime: docker
     plan: free
-    rootDir: ""
-    buildCommand: npm install -g pnpm && pnpm install && pnpm build:web
-    startCommand: cd apps/web && npm start
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
     envVars:
       - key: NODE_ENV
         value: production
