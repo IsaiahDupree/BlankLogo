@@ -14,9 +14,9 @@ services:
     name: blanklogo-api
     runtime: node
     plan: free
-    rootDir: apps/api
-    buildCommand: npm install -g pnpm && pnpm install && pnpm run build
-    startCommand: pnpm start
+    rootDir: ""
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/shared build && pnpm --filter @blanklogo/api build
+    startCommand: cd apps/api && pnpm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -40,9 +40,9 @@ services:
     name: blanklogo-worker
     runtime: node
     plan: free
-    rootDir: apps/worker
-    buildCommand: npm install -g pnpm && pnpm install && pnpm run build
-    startCommand: pnpm start
+    rootDir: ""
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/shared build && pnpm --filter @blanklogo/worker build
+    startCommand: cd apps/worker && pnpm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -66,9 +66,9 @@ services:
     name: blanklogo-web
     runtime: node
     plan: free
-    rootDir: apps/web
-    buildCommand: npm install -g pnpm && pnpm install && pnpm run build
-    startCommand: pnpm start
+    rootDir: ""
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/shared build && pnpm --filter @blanklogo/web build
+    startCommand: cd apps/web && pnpm start
     envVars:
       - key: NODE_ENV
         value: production
