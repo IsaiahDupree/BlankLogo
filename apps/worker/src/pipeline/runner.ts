@@ -8,6 +8,7 @@ import {
   createBasePath,
   createOutputPath,
 } from "./types";
+import { notifyJobCompleted, notifyJobFailed, notifyCreditsLow } from "../userNotify";
 
 // Step imports
 import { ingestInputs } from "./steps/ingest-inputs";
@@ -178,7 +179,7 @@ async function logEvent(jobId: string, stage: JobStatus, message: string, meta?:
   });
 }
 
-async function failJob(jobId: string, errorCode: JobErrorCode, errorMessage: string): Promise<void> {
+async function failJob(jobId: string, errorCode: JobErrorCode, errorMessage: string, userId?: string): Promise<void> {
   console.error(`[Pipeline] Job ${jobId} failed: ${errorCode} - ${errorMessage}`);
   
   await supabase
@@ -197,7 +198,15 @@ async function failJob(jobId: string, errorCode: JobErrorCode, errorMessage: str
   // Release reserved credits
   await supabase.rpc("release_job_credits", { p_job_id: jobId });
 
-  // TODO: Send failure notification email
+  // Send failure notification email
+  if (userId) {
+    try {
+      await notifyJobFailed(userId, jobId, errorMessage, 'pipeline');
+      console.log(`[Pipeline] Failure notification sent for job ${jobId}`);
+    } catch (err) {
+      console.error(`[Pipeline] Failed to send failure notification:`, err);
+    }
+  }
 }
 
 async function completeJob(jobId: string, ctx: PipelineContext): Promise<void> {
@@ -241,5 +250,26 @@ async function completeJob(jobId: string, ctx: PipelineContext): Promise<void> {
     })
     .eq("id", ctx.projectId);
 
-  // TODO: Send completion notification email
+  // Send completion notification email
+  if (ctx.userId) {
+    try {
+      const outputUrl = ctx.artifacts.timelinePath || '';
+      const processingTime = ctx.artifacts.narrationDurationMs || 0;
+      await notifyJobCompleted(ctx.userId, jobId, outputUrl, processingTime, 'pipeline');
+      console.log(`[Pipeline] Completion notification sent for job ${jobId}`);
+      
+      // Check if credits are low and notify
+      const { data: profile } = await supabase
+        .from('bl_profiles')
+        .select('credits_balance')
+        .eq('id', ctx.userId)
+        .single();
+      
+      if (profile && profile.credits_balance <= 5) {
+        await notifyCreditsLow(ctx.userId, profile.credits_balance);
+      }
+    } catch (err) {
+      console.error(`[Pipeline] Failed to send completion notification:`, err);
+    }
+  }
 }
