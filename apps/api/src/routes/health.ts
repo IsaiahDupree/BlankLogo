@@ -4,11 +4,12 @@
  */
 
 import { Router, Request, Response } from 'express';
+import type { Router as RouterType } from 'express';
 import Redis from 'ioredis';
 import { createClient } from '@supabase/supabase-js';
 import os from 'os';
 
-const router = Router();
+const router: RouterType = Router();
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const supabaseUrl = process.env.SUPABASE_URL || '';

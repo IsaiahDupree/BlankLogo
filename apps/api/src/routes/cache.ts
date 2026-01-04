@@ -4,9 +4,10 @@
  */
 
 import { Router, Request, Response } from 'express';
+import type { Router as RouterType } from 'express';
 import Redis from 'ioredis';
 
-const router = Router();
+const router: RouterType = Router();
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 let redis: Redis | null = null;

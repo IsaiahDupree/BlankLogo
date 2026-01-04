@@ -4,9 +4,10 @@
  */
 
 import { Router, Request, Response } from 'express';
+import type { Router as RouterType } from 'express';
 import { createClient } from '@supabase/supabase-js';
 
-const router = Router();
+const router: RouterType = Router();
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || '';
