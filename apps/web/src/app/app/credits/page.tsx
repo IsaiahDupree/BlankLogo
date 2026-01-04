@@ -7,10 +7,12 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 import { 
   trackViewContent, 
-  trackSelectCreditPack, 
-  trackStartCheckout, 
-  trackCreditPurchase 
+  trackSelectCreditPack as metaSelectPack, 
+  trackStartCheckout as metaStartCheckout, 
+  trackCreditPurchase as metaPurchase 
 } from "@/lib/meta-pixel";
+import * as ga from "@/lib/google-analytics";
+import * as ph from "@/lib/posthog";
 
 // Logging utility
 function logCredits(message: string, data?: unknown) {
@@ -67,14 +69,11 @@ export default function CreditsPage() {
       const credits = parseInt(searchParams.get("credits") || "0", 10);
       
       if (price > 0) {
-        trackCreditPurchase({
-          packId,
-          packName,
-          price,
-          credits,
-          orderId: searchParams.get("session_id") || undefined,
-        });
-        logCredits("📊 Meta Purchase event tracked", { packId, price, credits });
+        // Track purchase across all analytics platforms
+        metaPurchase({ packId, packName, price, credits, orderId: searchParams.get("session_id") || undefined });
+        ga.trackCreditPurchase({ packId, packName, price, credits, transactionId: searchParams.get("session_id") || undefined });
+        ph.trackCreditPurchase({ packId, packName, price, credits, orderId: searchParams.get("session_id") || undefined });
+        logCredits("📊 Purchase tracked (Meta, GA, PostHog)", { packId, price, credits });
       }
     }
     if (canceled) {
@@ -129,24 +128,20 @@ export default function CreditsPage() {
     logCredits("🛒 Purchase initiated:", { packId, isSubscription });
     setPurchasing(packId);
 
-    // Find pack details for Meta tracking
+    // Find pack details for tracking
     const pack = CREDIT_PACKS.find(p => p.id === packId);
     if (pack) {
-      // Track Add to Cart
-      trackSelectCreditPack({
-        packName: `${pack.credits} Credits`,
-        packId: pack.id,
-        price: pack.price,
-        credits: pack.credits,
-      });
+      // Track Add to Cart across all platforms
+      metaSelectPack({ packName: `${pack.credits} Credits`, packId: pack.id, price: pack.price, credits: pack.credits });
+      ga.trackSelectCreditPack({ packId: pack.id, packName: `${pack.credits} Credits`, price: pack.price, credits: pack.credits });
+      ph.trackSelectCreditPack({ packId: pack.id, packName: `${pack.credits} Credits`, price: pack.price, credits: pack.credits });
       
-      // Track Initiate Checkout
-      trackStartCheckout({
-        packId: pack.id,
-        price: pack.price,
-        credits: pack.credits,
-      });
-      logCredits("📊 Meta AddToCart + InitiateCheckout tracked", { packId, price: pack.price });
+      // Track Initiate Checkout across all platforms
+      metaStartCheckout({ packId: pack.id, price: pack.price, credits: pack.credits });
+      ga.trackBeginCheckout({ items: [{ itemId: pack.id, itemName: `${pack.credits} Credits`, price: pack.price }], value: pack.price });
+      ph.trackBeginCheckout({ products: [{ id: pack.id, name: `${pack.credits} Credits`, price: pack.price }], value: pack.price });
+      
+      logCredits("📊 AddToCart + Checkout tracked (Meta, GA, PostHog)", { packId, price: pack.price });
     }
 
     try {
