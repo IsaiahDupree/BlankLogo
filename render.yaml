@@ -59,25 +59,5 @@ services:
       - key: SUPABASE_SERVICE_KEY
         sync: false
 
-  # Web App (Next.js)
-  - type: web
-    name: blanklogo-web
-    runtime: node
-    plan: free
-    region: oregon
-    buildCommand: "npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/web build"
-    startCommand: "cd apps/web && npm start"
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 3939
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        sync: false
-      - key: NEXT_PUBLIC_API_URL
-        fromService:
-          name: blanklogo-api
-          type: web
-          property: host
+  # Web App deployed to Vercel (not Render)
+  # See: https://vercel.com/isaiahduprees-projects/blanklogo-web
