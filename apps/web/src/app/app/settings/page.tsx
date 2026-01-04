@@ -133,6 +133,7 @@ export default function SettingsPage() {
       
       if (isAutoSave) {
         setAutoSaveStatus('saved');
+        toast.success("Preferences saved!");
         setTimeout(() => setAutoSaveStatus('idle'), 2000);
       } else {
         setSaved(true);
