@@ -26,6 +26,22 @@ try {
   console.log('[UserNotify] Redis cache not available, using DB directly');
 }
 
+/**
+ * Invalidate user preferences cache
+ * Call this when user updates their notification preferences
+ */
+export async function invalidateUserPrefsCache(userId: string): Promise<void> {
+  if (!redis) return;
+  
+  const cacheKey = `user:prefs:${userId}`;
+  try {
+    await redis.del(cacheKey);
+    console.log(`[UserNotify] Cache invalidated for user: ${userId}`);
+  } catch (err) {
+    console.log('[UserNotify] Cache invalidation error:', err instanceof Error ? err.message : err);
+  }
+}
+
 let resend: Resend | null = null;
 
 if (RESEND_API_KEY) {
