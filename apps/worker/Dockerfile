@@ -1,37 +1,19 @@
-# BlankLogo Worker - Railway Deployment
-# Includes Node.js and FFmpeg for watermark removal processing
-
+# BlankLogo Worker - Render Deployment
 FROM node:20-slim
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    # FFmpeg for audio/video processing
-    ffmpeg \
-    # Additional utilities
-    curl \
-    # Clean up
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ffmpeg curl && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Install pnpm
+# Install pnpm globally
 RUN npm install -g pnpm
 
-# Copy package files first for better caching
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/worker/package.json ./apps/worker/
-COPY packages/shared/package.json ./packages/shared/
+# Copy all files
+COPY . .
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy source code
-COPY apps/worker ./apps/worker
-COPY packages/shared ./packages/shared
-
-# Build worker
-RUN pnpm --filter @blanklogo/worker build
+# Install and build
+RUN pnpm install --no-frozen-lockfile && pnpm --filter @blanklogo/worker build
 
 # Set environment
 ENV NODE_ENV=production

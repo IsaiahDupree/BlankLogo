@@ -1,25 +1,16 @@
-# BlankLogo API - Railway Deployment
+# BlankLogo API - Render Deployment
 FROM node:20-slim
 
 WORKDIR /app
 
-# Install pnpm
+# Install pnpm globally
 RUN npm install -g pnpm
 
-# Copy package files first for better caching
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/api/package.json ./apps/api/
-COPY packages/shared/package.json ./packages/shared/
+# Copy all files
+COPY . .
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy source code
-COPY apps/api ./apps/api
-COPY packages/shared ./packages/shared
-
-# Build API
-RUN pnpm --filter @blanklogo/api build
+# Install and build
+RUN pnpm install --no-frozen-lockfile && pnpm --filter @blanklogo/api build
 
 # Set environment
 ENV NODE_ENV=production

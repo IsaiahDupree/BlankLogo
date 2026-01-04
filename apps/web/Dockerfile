@@ -1,43 +1,22 @@
-# BlankLogo Web Frontend - Docker Build
-FROM node:20-slim AS builder
+# BlankLogo Web Frontend - Render Deployment
+FROM node:20-slim
 
 WORKDIR /app
 
-# Install pnpm
+# Install pnpm globally
 RUN npm install -g pnpm
 
-# Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json ./apps/web/
-COPY packages/shared/package.json ./packages/shared/
+# Copy all files
+COPY . .
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy source
-COPY apps/web ./apps/web
-COPY packages/shared ./packages/shared
-
-# Build
+# Install and build
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter @blanklogo/web build
+RUN pnpm install --no-frozen-lockfile && pnpm --filter @blanklogo/web build
 
-# Production image
-FROM node:20-slim AS runner
-
-WORKDIR /app
-
+# Set environment
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3939
 
-# Copy built assets
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
+EXPOSE 3939
 
-EXPOSE 3838
-
-ENV PORT=3838
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "apps/web/server.js"]
+CMD ["sh", "-c", "cd apps/web && npm start"]
