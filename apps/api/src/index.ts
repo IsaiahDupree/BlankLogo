@@ -448,7 +448,7 @@ interface JobStatus {
 // Platform-specific crop presets
 const PLATFORM_PRESETS: Record<string, { cropPixels: number; cropPosition: 'bottom' | 'top' }> = {
   auto: { cropPixels: 0, cropPosition: 'bottom' },       // Auto-detect watermark
-  sora: { cropPixels: 100, cropPosition: 'bottom' },
+  sora: { cropPixels: 120, cropPosition: 'bottom' },
   tiktok: { cropPixels: 80, cropPosition: 'bottom' },
   runway: { cropPixels: 60, cropPosition: 'bottom' },
   pika: { cropPixels: 50, cropPosition: 'bottom' },
@@ -761,7 +761,7 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
       crop_pixels,
       crop_position = 'bottom',
       platform = 'sora',
-      processing_mode = 'crop',
+      processing_mode = 'inpaint',
       webhook_url,
       metadata,
     } = req.body;
@@ -939,7 +939,7 @@ app.post('/api/v1/jobs/upload', authenticateToken, upload.single('video'), async
       crop_pixels,
       crop_position = 'bottom',
       platform = 'sora',
-      processing_mode = 'crop',
+      processing_mode = 'inpaint',
       webhook_url,
     } = req.body;
 
@@ -1012,6 +1012,7 @@ app.post('/api/v1/jobs/upload', authenticateToken, upload.single('video'), async
 app.get('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { jobId } = req.params;
+    console.log(`[JOB STATUS] 📊 Fetching job: ${jobId}`);
 
     const { data: job, error } = await supabase
       .from('bl_jobs')
@@ -1020,13 +1021,18 @@ app.get('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedReque
       .single();
 
     if (error || !job) {
+      console.log(`[JOB STATUS] ❌ Job not found: ${jobId}`);
       return res.status(404).json({ error: 'Job not found' });
     }
 
+    // Get real progress from database, or calculate based on status
+    const realProgress = job.progress ?? (job.status === 'completed' ? 100 : job.status === 'failed' ? 0 : job.status === 'processing' ? 50 : 0);
+    console.log(`[JOB STATUS] ✅ Job ${jobId}: status=${job.status}, progress=${realProgress}%, current_step=${job.current_step || 'N/A'}`);
+    
     const response: JobStatus = {
       jobId: job.id,
       status: job.status,
-      progress: job.status === 'completed' ? 100 : job.status === 'processing' ? 50 : 0,
+      progress: realProgress,
       input: {
         filename: job.input_filename,
         sizeBytes: job.input_size_bytes,
@@ -1093,7 +1099,7 @@ app.get('/api/v1/jobs/:jobId/download', authenticateToken, async (req: Authentic
 // Batch job creation (requires authentication)
 app.post('/api/v1/jobs/batch', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const { videos, crop_pixels, crop_position, platform = 'sora', processing_mode = 'crop', webhook_url } = req.body;
+    const { videos, crop_pixels, crop_position, platform = 'sora', processing_mode = 'inpaint', webhook_url } = req.body;
 
     if (!videos || !Array.isArray(videos) || videos.length === 0) {
       return res.status(400).json({ error: 'videos array is required' });

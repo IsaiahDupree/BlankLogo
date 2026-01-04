@@ -34,7 +34,7 @@ interface JobStatus {
 
 const PLATFORMS = [
   { id: "auto", name: "Auto-Detect", cropPixels: 0, color: "from-indigo-500 to-purple-600", description: "AI automatically detects and removes the watermark", supported: true },
-  { id: "sora", name: "Sora", cropPixels: 100, color: "from-purple-500 to-pink-500", description: "OpenAI Sora videos", supported: true },
+  { id: "sora", name: "Sora", cropPixels: 120, color: "from-purple-500 to-pink-500", description: "OpenAI Sora videos", supported: true },
   { id: "tiktok", name: "TikTok", cropPixels: 80, color: "from-cyan-500 to-blue-500", description: "TikTok videos", supported: true },
   { id: "runway", name: "Runway", cropPixels: 60, color: "from-green-500 to-emerald-500", description: "Runway ML videos", supported: true },
   { id: "pika", name: "Pika", cropPixels: 50, color: "from-orange-500 to-red-500", description: "Pika Labs videos", supported: true },
@@ -71,9 +71,14 @@ export default function RemoveWatermarkPage() {
   const pollJobStatus = useCallback(async (id: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        logRemove("⚠️ No session found during poll");
+        return;
+      }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8989";
+      logRemove("🔄 Polling job status...", { jobId: id, apiUrl });
+      
       const res = await fetch(`${apiUrl}/api/v1/jobs/${id}`, {
         headers: {
           "Authorization": `Bearer ${session.access_token}`,
@@ -84,19 +89,25 @@ export default function RemoveWatermarkPage() {
         const data = await res.json();
         const job = data.job || data;
         setJobStatus(job);
-        logRemove("📊 Job status poll:", {
-          id: job.id,
+        
+        // Enhanced logging with step info
+        const progress = job.progress || 0;
+        const currentStepName = job.current_step || PROCESSING_STEPS[Math.min(Math.floor(progress / 17), PROCESSING_STEPS.length - 1)]?.label || "Unknown";
+        
+        console.log(`%c[JOB ${id}] ${job.status.toUpperCase()} - ${progress}% - ${currentStepName}`, 
+          `color: ${job.status === 'completed' ? 'green' : job.status === 'failed' ? 'red' : 'blue'}; font-weight: bold;`);
+        
+        logRemove("📊 Job status:", {
+          jobId: job.jobId || job.id,
           status: job.status,
-          progress: job.progress,
-          error: job.error,
-          error_code: job.error_code,
-          error_message: job.error_message,
-          input_url: job.input_url,
-          output_url: job.output_url,
+          progress: `${progress}%`,
+          currentStep: currentStepName,
+          input: job.input?.filename || job.input_filename,
+          output: job.output?.downloadUrl || job.output_url || "(processing...)",
+          processingTime: job.processingTimeMs ? `${(job.processingTimeMs / 1000).toFixed(1)}s` : "(in progress)",
         });
 
         // Update current step based on progress
-        const progress = job.progress || 0;
         const stepIndex = Math.min(Math.floor(progress / 17), PROCESSING_STEPS.length - 1);
         setCurrentStep(stepIndex);
 
@@ -106,24 +117,39 @@ export default function RemoveWatermarkPage() {
           setIsProcessing(false);
           setSuccess(true);
           toast.success("Watermark removed successfully!");
-          logRemove("✅ Job completed!", { output_url: job.output_url });
+          console.log("%c✅ JOB COMPLETED!", "color: green; font-size: 16px; font-weight: bold;");
+          logRemove("✅ Job completed!", { 
+            output_url: job.output?.downloadUrl || job.output_url,
+            processingTime: job.processingTimeMs ? `${(job.processingTimeMs / 1000).toFixed(1)}s` : "unknown",
+            outputSize: job.output?.sizeBytes ? `${(job.output.sizeBytes / 1024 / 1024).toFixed(2)} MB` : "unknown"
+          });
         } else if (status === "failed") {
           setIsProcessing(false);
           const errorMsg = job.error || job.error_message || data.error || "Processing failed";
           setError(errorMsg);
           toast.error(errorMsg);
+          console.log("%c❌ JOB FAILED!", "color: red; font-size: 16px; font-weight: bold;");
           logRemove("❌ Job failed:", { 
             error: errorMsg,
             error_code: job.error_code,
-            error_message: job.error_message,
-            fullJob: job 
+            tip: "Try: 1) Copy the direct video URL, 2) Upload the video file directly"
           });
+        } else if (status === "processing") {
+          logRemove(`⏳ Processing: ${progress}% - ${currentStepName}`);
+        } else if (status === "queued") {
+          logRemove("⏳ Job queued, waiting for worker...");
         }
       } else {
         const errorData = await res.json().catch(() => ({}));
-        logRemove("❌ Job poll failed:", { status: res.status, error: errorData });
+        console.log("%c❌ Poll request failed", "color: red; font-weight: bold;");
+        logRemove("❌ Job poll failed:", { 
+          status: res.status, 
+          statusText: res.statusText,
+          error: errorData.error || errorData.message || "Unknown error"
+        });
       }
     } catch (err) {
+      console.log("%c❌ Network error during poll", "color: red; font-weight: bold;");
       logRemove("❌ Error polling job:", err);
     }
   }, [supabase, toast]);
@@ -243,7 +269,16 @@ export default function RemoveWatermarkPage() {
         setJobId(data.jobId);
         setIsProcessing(true);
         setCurrentStep(0);
-        logRemove("✅ Job created successfully:", data.jobId);
+        console.log("%c🎬 JOB CREATED: " + data.jobId, "color: green; font-size: 14px; font-weight: bold;");
+        logRemove("✅ Job created successfully:", {
+          jobId: data.jobId,
+          status: data.status,
+          platform: data.platform,
+          cropPixels: data.crop_pixels,
+          creditsCharged: data.credits_charged,
+          estimatedCompletion: data.estimated_completion
+        });
+        console.log("%c⏳ Starting job monitoring... Watch for progress updates below", "color: blue; font-style: italic;");
       } else if (mode === "upload" && selectedFile) {
         const formData = new FormData();
         formData.append("video", selectedFile);

@@ -14,10 +14,11 @@ const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? 2);
 const INPAINT_SERVICE_URL = process.env.INPAINT_SERVICE_URL || "http://localhost:8081";
 
 // Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_KEY || ""
-);
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || "";
+console.log(`[Worker] Supabase URL: ${supabaseUrl || '(not set)'}`);
+console.log(`[Worker] Supabase Key: ${supabaseKey ? '***' + supabaseKey.slice(-8) : '(not set)'}`);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type ProcessingMode = "crop" | "inpaint" | "auto";
 
@@ -510,6 +511,9 @@ async function downloadFromPage(url: string, destPath: string): Promise<boolean>
 }
 
 async function downloadFile(url: string, destPath: string): Promise<void> {
+  console.log(`[Worker] 📥 Starting download...`);
+  console.log(`[Worker]    URL: ${url}`);
+  
   // Use the scalable download module (works on local, Vercel, Railway)
   const result = await downloadVideo(url, destPath);
   
@@ -523,6 +527,70 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   }
   
   console.log(`[Worker] ✅ Downloaded ${result.size} bytes via ${result.method}`);
+  
+  // Validate the downloaded file is a real video
+  if (!fs.existsSync(destPath)) {
+    throw new Error('Download completed but file not found on disk');
+  }
+  
+  const fileSize = fs.statSync(destPath).size;
+  console.log(`[Worker]    File size on disk: ${fileSize} bytes`);
+  
+  if (fileSize < 10000) {
+    // Read first bytes to see what we got
+    const buffer = Buffer.alloc(Math.min(500, fileSize));
+    const fd = fs.openSync(destPath, 'r');
+    fs.readSync(fd, buffer, 0, buffer.length, 0);
+    fs.closeSync(fd);
+    const content = buffer.toString('utf8').substring(0, 200);
+    console.error(`[Worker] ❌ File too small (${fileSize} bytes). Content preview: ${content}`);
+    throw new Error(
+      `Downloaded file is too small (${fileSize} bytes) and may not be a valid video. ` +
+      `The URL might require authentication or be blocked. Try: 1) Copy the direct video URL, ` +
+      `2) Upload the video file directly.`
+    );
+  }
+  
+  // Check for valid video signature (MP4, WebM, etc.)
+  const header = Buffer.alloc(12);
+  const fd = fs.openSync(destPath, 'r');
+  fs.readSync(fd, header, 0, 12, 0);
+  fs.closeSync(fd);
+  
+  const isMp4 = header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70; // ftyp
+  const isWebm = header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3; // EBML
+  const isMov = header[4] === 0x6d && header[5] === 0x6f && header[6] === 0x6f && header[7] === 0x76; // moov
+  
+  // Check for HTML or invalid content
+  const textBuffer = Buffer.alloc(500);
+  const fd2 = fs.openSync(destPath, 'r');
+  fs.readSync(fd2, textBuffer, 0, 500, 0);
+  fs.closeSync(fd2);
+  const textContent = textBuffer.toString('utf8').toLowerCase();
+  
+  if (textContent.includes('<!doctype') || textContent.includes('<html') || textContent.includes('cloudflare') || textContent.includes('login')) {
+    console.error(`[Worker] ❌ Downloaded file is HTML, not video`);
+    console.error(`[Worker]    Content preview: ${textContent.substring(0, 100)}`);
+    throw new Error(
+      `Downloaded file is a webpage, not a video. The URL may be protected or require login. ` +
+      `Try: 1) Right-click the video → "Copy video address", 2) Upload the video file directly.`
+    );
+  }
+  
+  if (!isMp4 && !isWebm && !isMov) {
+    // Not a recognized video format
+    if (fileSize < 500000) {
+      console.error(`[Worker] ❌ Downloaded file is not a valid video format`);
+      console.error(`[Worker]    Size: ${fileSize} bytes, Header: ${header.toString('hex')}`);
+      throw new Error(
+        `Downloaded file is not a valid video (${(fileSize/1024).toFixed(1)} KB). ` +
+        `The URL may require login or be protected. Try uploading the video file directly.`
+      );
+    }
+    console.log(`[Worker]    ⚠️ Unknown video format, proceeding anyway (${(fileSize/1024/1024).toFixed(2)} MB)`);
+  } else {
+    console.log(`[Worker]    Video signature: ${isMp4 ? 'MP4' : isWebm ? 'WebM' : 'MOV'}`);
+  }
 }
 
 async function getVideoInfo(filePath: string): Promise<VideoInfo> {
@@ -541,7 +609,12 @@ async function getVideoInfo(filePath: string): Promise<VideoInfo> {
 
     ffprobe.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`ffprobe exited with code ${code}`));
+        // Check if the file might be HTML instead of video
+        const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+        const errorHint = fileSize < 500000 
+          ? " The downloaded file may not be a valid video (possibly HTML/login page). Try uploading the video directly or use a direct video URL."
+          : "";
+        reject(new Error(`ffprobe exited with code ${code}.${errorHint}`));
         return;
       }
       try {
@@ -587,29 +660,50 @@ async function removeWatermarkCrop(
         cropFilter = `crop=${width}:${height - cropPixels}:0:0`;
     }
 
-    console.log(`[Worker] Applying crop filter: ${cropFilter}`);
+    console.log(`[Worker] 🎬 FFmpeg starting...`);
+    console.log(`[Worker]    Input: ${inputPath}`);
+    console.log(`[Worker]    Output: ${outputPath}`);
+    console.log(`[Worker]    Crop filter: ${cropFilter}`);
 
-    const ffmpeg = spawn("ffmpeg", [
+    const ffmpegArgs = [
       "-y",
       "-i", inputPath,
       "-vf", cropFilter,
       "-c:a", "copy",
-      "-movflags", "+faststart",
+      "-preset", "fast",
       outputPath
-    ]);
+    ];
+    console.log(`[Worker]    Command: ffmpeg ${ffmpegArgs.join(' ')}`);
 
-    ffmpeg.stdout.on("data", (data) => { console.log(`ffmpeg: ${data}`); });
-    ffmpeg.stderr.on("data", (data) => { console.log(`ffmpeg: ${data}`); });
+    const ffmpeg = spawn("ffmpeg", ffmpegArgs);
+
+    let stderrOutput = '';
+    ffmpeg.stdout.on("data", (data) => { 
+      console.log(`[FFmpeg stdout] ${data}`); 
+    });
+    ffmpeg.stderr.on("data", (data) => { 
+      const msg = data.toString();
+      stderrOutput += msg;
+      // Only log progress updates, skip the verbose codec info
+      if (msg.includes('frame=') || msg.includes('time=') || msg.includes('error') || msg.includes('Error')) {
+        console.log(`[FFmpeg] ${msg.trim()}`);
+      }
+    });
 
     ffmpeg.on("close", (code) => {
+      console.log(`[Worker] 🎬 FFmpeg exited with code: ${code}`);
       if (code === 0) {
+        console.log(`[Worker] ✅ FFmpeg processing successful`);
         resolve({ mode: "crop" });
       } else {
-        reject(new Error(`FFmpeg exited with code ${code}`));
+        console.error(`[Worker] ❌ FFmpeg failed with code ${code}`);
+        console.error(`[Worker]    Last stderr: ${stderrOutput.slice(-500)}`);
+        reject(new Error(`FFmpeg exited with code ${code}. Check logs for details.`));
       }
     });
 
     ffmpeg.on("error", (err) => {
+      console.error(`[Worker] ❌ FFmpeg spawn error: ${err.message}`);
       reject(new Error(`FFmpeg error: ${err.message}`));
     });
   });
@@ -660,23 +754,12 @@ async function removeWatermark(
   cropPixels: number,
   cropPosition: string,
   videoInfo: VideoInfo,
-  processingMode: ProcessingMode = "crop"
+  processingMode: ProcessingMode = "inpaint"
 ): Promise<{ mode: string; watermarksDetected?: number }> {
-  if (processingMode === "inpaint" || processingMode === "auto") {
-    try {
-      // Try inpainting first
-      return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
-    } catch (error) {
-      if (processingMode === "auto") {
-        // Fallback to crop mode if inpainting fails
-        console.log(`[Worker] Inpainting failed, falling back to crop mode: ${error}`);
-        return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
-      }
-      throw error;
-    }
-  }
-  
-  return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
+  // Always use AI inpainting for all sources - no cropping
+  // This preserves full frame and uses YOLO detection + LAMA/OpenCV inpainting
+  console.log(`[Worker] 🤖 Using AI inpainting (preserves full frame)`);
+  return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
 }
 
 async function uploadToStorage(filePath: string, jobId: string, filename: string): Promise<string> {
@@ -713,30 +796,67 @@ async function processJob(job: Job<JobData>): Promise<void> {
   const { jobId, inputUrl, inputFilename, cropPixels, cropPosition, processingMode = "crop", webhookUrl } = job.data;
   const startTime = Date.now();
 
-  console.log(`[Worker] Processing job ${jobId}`);
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`[Worker] 🎬 STARTING JOB: ${jobId}`);
+  console.log(`${'═'.repeat(60)}`);
+  console.log(`[Worker] 📋 Job Details:`);
+  console.log(`[Worker]    Input URL: ${inputUrl}`);
+  console.log(`[Worker]    Platform: ${job.data.platform || 'auto'}`);
+  console.log(`[Worker]    Crop Pixels: ${cropPixels}px (${cropPosition})`);
+  console.log(`[Worker]    Processing Mode: ${processingMode}`);
+  console.log(`[Worker]    Webhook: ${webhookUrl || 'none'}`);
+
+  // Helper to update progress
+  const updateProgress = async (progress: number, step: string) => {
+    console.log(`[Worker] 📊 Progress: ${progress}% - ${step}`);
+    const { error } = await supabase
+      .from("bl_jobs")
+      .update({ progress, current_step: step })
+      .eq("id", jobId);
+    if (error) console.error(`[Worker] ❌ Failed to update progress:`, error.message);
+  };
 
   // Update status to processing
-  await supabase
+  console.log(`[Worker] 📊 Step 1/6: Updating job status to 'processing'...`);
+  const { error: statusError } = await supabase
     .from("bl_jobs")
-    .update({ status: "processing", started_at: new Date().toISOString() })
+    .update({ status: "processing", started_at: new Date().toISOString(), progress: 5, current_step: "Starting" })
     .eq("id", jobId);
+  if (statusError) {
+    console.error(`[Worker] ❌ Failed to update status to processing:`, statusError.message);
+  } else {
+    console.log(`[Worker] ✅ Status updated to 'processing'`);
+  }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `blanklogo-${jobId}-`));
   const inputPath = path.join(tmpDir, "input.mp4");
-  const outputFilename = inputFilename.replace(/\.[^.]+$/, "_clean.mp4");
+  // Ensure output filename always has .mp4 extension
+  const baseName = inputFilename.replace(/\.[^.]+$/, "") || inputFilename;
+  const outputFilename = `${baseName}_clean.mp4`;
   const outputPath = path.join(tmpDir, outputFilename);
+  console.log(`[Worker] 📁 Temp directory: ${tmpDir}`);
 
   try {
     // Download input video
-    console.log(`[Worker] Downloading video from ${inputUrl}`);
+    await updateProgress(10, "Downloading video");
+    console.log(`[Worker] ⬇️ Step 2/6: Downloading video...`);
+    console.log(`[Worker]    URL: ${inputUrl}`);
+    const downloadStart = Date.now();
     await downloadFile(inputUrl, inputPath);
+    const downloadTime = Date.now() - downloadStart;
     const inputSize = fs.statSync(inputPath).size;
+    console.log(`[Worker] ✅ Download complete: ${(inputSize / 1024 / 1024).toFixed(2)} MB in ${(downloadTime / 1000).toFixed(1)}s`);
 
     // Get video info
+    await updateProgress(30, "Analyzing video");
+    console.log(`[Worker] 🔍 Step 3/6: Analyzing video...`);
     const videoInfo = await getVideoInfo(inputPath);
-    console.log(`[Worker] Video info: ${videoInfo.width}x${videoInfo.height}, ${videoInfo.duration}s`);
+    console.log(`[Worker] ✅ Video analysis complete:`);
+    console.log(`[Worker]    Resolution: ${videoInfo.width}x${videoInfo.height}`);
+    console.log(`[Worker]    Duration: ${videoInfo.duration}s`);
 
     // Update input info in database
+    console.log(`[Worker] 📊 Updating video metadata in database...`);
     await supabase
       .from("bl_jobs")
       .update({
@@ -746,22 +866,39 @@ async function processJob(job: Job<JobData>): Promise<void> {
       .eq("id", jobId);
 
     // Remove watermark
-    console.log(`[Worker] Processing mode: ${processingMode}`);
+    await updateProgress(40, "Removing watermark");
+    console.log(`[Worker] ✨ Step 4/6: Removing watermark...`);
+    console.log(`[Worker]    Mode: ${processingMode}`);
+    console.log(`[Worker]    Crop: ${cropPixels}px from ${cropPosition}`);
+    const processStart = Date.now();
     const processResult = await removeWatermark(inputPath, outputPath, cropPixels, cropPosition, videoInfo, processingMode);
-    console.log(`[Worker] Processing complete with mode: ${processResult.mode}`);
+    const processTime = Date.now() - processStart;
+    console.log(`[Worker] ✅ Watermark removal complete:`);
+    console.log(`[Worker]    Method used: ${processResult.mode}`);
+    console.log(`[Worker]    Processing time: ${(processTime / 1000).toFixed(1)}s`);
     const outputSize = fs.statSync(outputPath).size;
+    console.log(`[Worker]    Output size: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
 
     // Upload processed video
-    console.log(`[Worker] Uploading processed video`);
+    await updateProgress(70, "Uploading result");
+    console.log(`[Worker] ⬆️ Step 5/6: Uploading processed video...`);
+    const uploadStart = Date.now();
     const outputUrl = await uploadToStorage(outputPath, jobId, outputFilename);
+    const uploadTime = Date.now() - uploadStart;
+    console.log(`[Worker] ✅ Upload complete in ${(uploadTime / 1000).toFixed(1)}s`);
+    console.log(`[Worker]    Output URL: ${outputUrl}`);
 
     const processingTime = Date.now() - startTime;
 
     // Update job as completed
+    await updateProgress(90, "Finalizing");
+    console.log(`[Worker] 📊 Step 6/6: Finalizing job...`);
     await supabase
       .from("bl_jobs")
       .update({
         status: "completed",
+        progress: 100,
+        current_step: "Complete",
         output_url: outputUrl,
         output_filename: outputFilename,
         output_size_bytes: outputSize,
@@ -771,7 +908,13 @@ async function processJob(job: Job<JobData>): Promise<void> {
       })
       .eq("id", jobId);
 
-    console.log(`[Worker] Job ${jobId} completed in ${processingTime}ms`);
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`[Worker] ✅ JOB COMPLETED: ${jobId}`);
+    console.log(`${'═'.repeat(60)}`);
+    console.log(`[Worker]    Total time: ${(processingTime / 1000).toFixed(1)}s`);
+    console.log(`[Worker]    Input: ${(inputSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`[Worker]    Output: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`${'═'.repeat(60)}\n`);
 
     // Send webhook if configured
     if (webhookUrl) {
@@ -785,7 +928,16 @@ async function processJob(job: Job<JobData>): Promise<void> {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Worker] Job ${jobId} failed:`, errorMessage);
+    const errorStack = error instanceof Error ? error.stack : "";
+    
+    console.log(`\n${'═'.repeat(60)}`);
+    console.error(`[Worker] ❌ JOB FAILED: ${jobId}`);
+    console.log(`${'═'.repeat(60)}`);
+    console.error(`[Worker]    Error: ${errorMessage}`);
+    if (errorStack) {
+      console.error(`[Worker]    Stack: ${errorStack.split('\n').slice(0, 3).join('\n')}`);
+    }
+    console.log(`${'═'.repeat(60)}\n`);
 
     await supabase
       .from("bl_jobs")
@@ -825,10 +977,20 @@ async function main(): Promise<void> {
   console.log(`[Worker] Capabilities: Chrome=${caps.chrome}, Chromium=${caps.chromium}, Browserless=${caps.browserless}, yt-dlp=${caps.ytdlp}, curl=${caps.curl}`);
 
   const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+  
+  redis.on('connect', () => {
+    console.log(`[Worker] ✅ Redis connected: ${REDIS_URL}`);
+  });
+  
+  redis.on('error', (err) => {
+    console.error(`[Worker] ❌ Redis error:`, err.message);
+  });
 
   const worker = new BullWorker<JobData>(
     "watermark-removal",
     async (job) => {
+      console.log(`\n[Worker] 📥 RECEIVED JOB: ${job.id}`);
+      console.log(`[Worker]    Data:`, JSON.stringify(job.data, null, 2));
       await processJob(job);
     },
     {
@@ -837,19 +999,29 @@ async function main(): Promise<void> {
     }
   );
 
+  worker.on("ready", () => {
+    console.log(`[Worker] ✅ Worker connected to queue "watermark-removal"`);
+  });
+
+  worker.on("active", (job) => {
+    console.log(`[Worker] 🔄 Job ${job.id} is now active`);
+  });
+
   worker.on("completed", (job) => {
-    console.log(`[Worker] Job ${job.id} completed successfully`);
+    console.log(`[Worker] ✅ Job ${job.id} completed successfully`);
   });
 
   worker.on("failed", (job, error) => {
-    console.error(`[Worker] Job ${job?.id} failed:`, error.message);
+    console.error(`[Worker] ❌ Job ${job?.id} failed:`, error.message);
   });
 
   worker.on("error", (error) => {
-    console.error("[Worker] Worker error:", error);
+    console.error("[Worker] ❌ Worker error:", error);
   });
 
   console.log("[Worker] Worker is ready and listening for jobs");
+  console.log(`[Worker] Queue: watermark-removal`);
+  console.log(`[Worker] Redis: ${REDIS_URL}`);
 
   // Graceful shutdown
   const shutdown = async () => {
