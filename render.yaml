@@ -35,14 +35,15 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
-  # Background Worker
-  - type: worker
+  # Background Worker (runs as web service with internal health endpoint)
+  - type: web
     name: blanklogo-worker
     runtime: node
     plan: free
     rootDir: apps/worker
     buildCommand: npm install -g pnpm && pnpm install && pnpm run build
     startCommand: pnpm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
