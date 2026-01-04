@@ -7,6 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { downloadVideo, checkCapabilities } from "./download.js";
+import { notifyJobStarted, notifyJobCompleted, notifyJobFailed, notifyCreditsLow } from "./userNotify.js";
 
 const WORKER_ID = process.env.WORKER_ID ?? `worker-${Math.random().toString(16).slice(2, 10)}`;
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -855,13 +856,20 @@ async function processJob(job: Job<JobData>): Promise<void> {
     console.log(`[Worker]    Resolution: ${videoInfo.width}x${videoInfo.height}`);
     console.log(`[Worker]    Duration: ${videoInfo.duration}s`);
 
-    // Update input info in database
+    // Upload original video for before/after comparison
+    console.log(`[Worker] 📤 Uploading original video for comparison...`);
+    const originalFilename = `original_${inputFilename}.mp4`;
+    const originalUrl = await uploadToStorage(inputPath, jobId, originalFilename);
+    console.log(`[Worker] ✅ Original video uploaded: ${originalUrl}`);
+
+    // Update input info in database with playable URL
     console.log(`[Worker] 📊 Updating video metadata in database...`);
     await supabase
       .from("bl_jobs")
       .update({
         input_size_bytes: inputSize,
         input_duration_sec: videoInfo.duration,
+        input_url: originalUrl,  // Update to playable URL instead of page URL
       })
       .eq("id", jobId);
 
@@ -926,6 +934,28 @@ async function processJob(job: Job<JobData>): Promise<void> {
       });
     }
 
+    // Send email notification to user
+    if (job.data.userId) {
+      await notifyJobCompleted(
+        job.data.userId,
+        jobId,
+        outputUrl,
+        processingTime,
+        job.data.platform || 'video'
+      );
+      
+      // Check if credits are low and notify
+      const { data: profile } = await supabase
+        .from('bl_profiles')
+        .select('credits_balance')
+        .eq('id', job.data.userId)
+        .single();
+      
+      if (profile && profile.credits_balance <= 5) {
+        await notifyCreditsLow(job.data.userId, profile.credits_balance);
+      }
+    }
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : "";
@@ -954,6 +984,16 @@ async function processJob(job: Job<JobData>): Promise<void> {
         status: "failed",
         error: errorMessage,
       });
+    }
+
+    // Send email notification to user on failure
+    if (job.data.userId) {
+      await notifyJobFailed(
+        job.data.userId,
+        jobId,
+        errorMessage,
+        job.data.platform || 'video'
+      );
     }
 
     throw error;
@@ -989,13 +1029,21 @@ async function main(): Promise<void> {
   const worker = new BullWorker<JobData>(
     "watermark-removal",
     async (job) => {
-      console.log(`\n[Worker] 📥 RECEIVED JOB: ${job.id}`);
+      const attemptNum = job.attemptsMade + 1;
+      const maxAttempts = 3;
+      console.log(`\n[Worker] 📥 RECEIVED JOB: ${job.id} (attempt ${attemptNum}/${maxAttempts})`);
       console.log(`[Worker]    Data:`, JSON.stringify(job.data, null, 2));
       await processJob(job);
     },
     {
       connection: redis,
       concurrency: CONCURRENCY,
+      settings: {
+        backoffStrategy: (attemptsMade: number) => {
+          // Exponential backoff: 5s, 10s, 20s
+          return Math.min(5000 * Math.pow(2, attemptsMade), 60000);
+        },
+      },
     }
   );
 

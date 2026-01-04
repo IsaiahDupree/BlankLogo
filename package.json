@@ -62,7 +62,13 @@
     "test:harness:baseline": "bash scripts/test-harness.sh baseline",
     "test:harness:crash": "bash scripts/test-harness.sh crash",
     "test:harness:depdown": "bash scripts/test-harness.sh depdown",
-    "test:harness:caps": "bash scripts/test-harness.sh caps"
+    "test:harness:caps": "bash scripts/test-harness.sh caps",
+    "test:deployment": "playwright test tests/deployment",
+    "test:deployment:smoke": "playwright test tests/deployment/smoke-tests.spec.ts",
+    "test:deployment:health": "playwright test tests/deployment/health-checks.spec.ts",
+    "deploy:notify": "npx tsx scripts/deploy-notify.ts",
+    "deploy:notify:success": "npx tsx scripts/deploy-notify.ts --status=success",
+    "deploy:notify:failure": "npx tsx scripts/deploy-notify.ts --status=failure"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
@@ -70,6 +76,8 @@
     "@types/node": "^20.11.0",
     "@vitest/coverage-v8": "^4.0.16",
     "msw": "^2.12.7",
+    "resend": "^4.0.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^4.0.16",
     "zod": "^3.23.8"

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import os from 'os';
+import { validateVideoUrl } from './utils/urlValidator.js';
 
 config();
 
@@ -432,6 +433,7 @@ interface JobStatus {
     filename: string;
     sizeBytes?: number;
     durationSec?: number;
+    url?: string;  // Original video URL for before/after comparison
   };
   output?: {
     filename: string;
@@ -770,6 +772,13 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
       return res.status(400).json({ error: 'video_url is required' });
     }
 
+    // Validate URL for security (SSRF prevention)
+    const urlValidation = validateVideoUrl(video_url);
+    if (!urlValidation.valid) {
+      console.log(`[API] ❌ URL validation failed: ${urlValidation.error}`);
+      return res.status(400).json({ error: `Invalid video URL: ${urlValidation.error}` });
+    }
+
     // Validate processing mode
     const validModes: ProcessingMode[] = ['crop', 'inpaint', 'auto'];
     if (!validModes.includes(processing_mode)) {
@@ -906,7 +915,14 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
     }
     
     console.log(`[API] 📤 Adding job ${jobId} to queue...`);
-    await jobQueue.add('remove-watermark', jobData, { jobId });
+    await jobQueue.add('remove-watermark', jobData, { 
+      jobId,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // 5s, 10s, 20s
+      },
+    });
     console.log(`[API] ✅ Job ${jobId} added to queue successfully`);
 
     const response = {
@@ -979,7 +995,14 @@ app.post('/api/v1/jobs/upload', authenticateToken, upload.single('video'), async
       console.error('[API] ❌ Job queue not available for upload');
       return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
     }
-    await jobQueue.add('remove-watermark', jobData, { jobId });
+    await jobQueue.add('remove-watermark', jobData, { 
+      jobId,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // 5s, 10s, 20s
+      },
+    });
 
     // Store job in database
     await supabase.from('bl_jobs').insert({
@@ -1037,6 +1060,7 @@ app.get('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedReque
         filename: job.input_filename,
         sizeBytes: job.input_size_bytes,
         durationSec: job.input_duration_sec,
+        url: job.input_url,  // Original video URL for before/after comparison
       },
       createdAt: job.created_at,
     };
@@ -1133,7 +1157,14 @@ app.post('/api/v1/jobs/batch', authenticateToken, async (req: AuthenticatedReque
         console.error('[API] ❌ Job queue not available for batch');
         return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
       }
-      await jobQueue.add('remove-watermark', jobData, { jobId });
+      await jobQueue.add('remove-watermark', jobData, { 
+      jobId,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // 5s, 10s, 20s
+      },
+    });
 
       await supabase.from('bl_jobs').insert({
         id: jobId,

@@ -30,6 +30,14 @@ export default defineConfig({
         baseURL: process.env.API_URL || "http://localhost:8989",
       },
     },
+    {
+      name: "deployment",
+      testDir: "./tests/deployment",
+      testMatch: /.*\.spec\.ts/,
+      use: {
+        baseURL: process.env.DEPLOY_WEB_URL || process.env.BASE_URL || "http://localhost:3939",
+      },
+    },
   ],
   webServer: process.env.SKIP_WEBSERVER ? undefined : [
     {

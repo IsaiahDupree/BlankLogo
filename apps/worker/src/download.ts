@@ -93,7 +93,9 @@ async function downloadWithLocalPuppeteer(url: string, destPath: string): Promis
       try {
         const chromium = await import('@sparticuz/chromium');
         args = [...chromium.default.args, '--disable-blink-features=AutomationControlled'];
-      } catch {}
+      } catch (e) {
+        console.log('[Download] Chromium import failed (expected in local env):', e instanceof Error ? e.message : e);
+      }
     }
     
     const browser = await puppeteerExtra.default.launch({
@@ -144,7 +146,9 @@ async function downloadWithLocalPuppeteer(url: string, destPath: string): Promis
             return { success: true, filePath: destPath, size: buffer.byteLength, method: 'puppeteer-local' };
           }
         }
-      } catch {}
+      } catch (e) {
+        console.log('[Download] Failed to fetch video URL:', videoUrl.substring(0, 80), e instanceof Error ? e.message : e);
+      }
     }
     
     return { success: false, error: 'No valid video URL found' };
@@ -206,7 +210,9 @@ async function downloadWithBrowserless(url: string, destPath: string): Promise<D
             return { success: true, filePath: destPath, size: buffer.byteLength, method: 'browserless' };
           }
         }
-      } catch {}
+      } catch (e) {
+        console.log('[Download] Browserless fetch failed:', videoUrl.substring(0, 80), e instanceof Error ? e.message : e);
+      }
     }
     
     return { success: false, error: 'No valid video URL found via Browserless' };
@@ -403,14 +409,18 @@ export async function checkCapabilities(): Promise<{
     const { execSync } = await import('child_process');
     execSync('which yt-dlp', { stdio: 'ignore' });
     ytdlpAvailable = true;
-  } catch {}
+  } catch {
+    // yt-dlp not installed - this is expected in some environments
+  }
   
   let curlAvailable = false;
   try {
     const { execSync } = await import('child_process');
     execSync('which curl', { stdio: 'ignore' });
     curlAvailable = true;
-  } catch {}
+  } catch {
+    // curl not installed - this is expected in some environments
+  }
   
   return {
     chrome: !!chromePath && !IS_CLOUD,

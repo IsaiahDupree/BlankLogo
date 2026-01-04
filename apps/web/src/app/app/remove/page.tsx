@@ -27,6 +27,19 @@ interface JobStatus {
   status: string;
   progress: number;
   output_url?: string;
+  input_url?: string;
+  input?: {
+    filename?: string;
+    sizeBytes?: number;
+    durationSec?: number;
+    url?: string;
+  };
+  output?: {
+    filename?: string;
+    sizeBytes?: number;
+    downloadUrl?: string;
+    expiresAt?: string;
+  };
   error?: string;
   created_at: string;
   updated_at: string;
@@ -407,12 +420,13 @@ export default function RemoveWatermarkPage() {
     );
   }
 
-  // Success state - show completed video
+  // Success state - show completed video with before/after comparison
   if (success && jobId) {
-    const outputUrl = jobStatus?.output_url;
+    const outputUrl = jobStatus?.output_url || jobStatus?.output?.downloadUrl;
+    const inputUrl = jobStatus?.input?.url || jobStatus?.input_url;
     
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-8 max-w-4xl mx-auto">
         <div className="rounded-2xl bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/20 overflow-hidden">
           {/* Success header */}
           <div className="p-6 text-center border-b border-green-500/20">
@@ -423,37 +437,86 @@ export default function RemoveWatermarkPage() {
             <p className="text-gray-400 text-sm">Your video is ready to download</p>
           </div>
 
-          {/* Video preview */}
+          {/* Before/After Video Comparison */}
           <div className="p-6">
-            {outputUrl ? (
-              <div className="relative rounded-xl overflow-hidden bg-black aspect-video mb-6">
-                <video
-                  src={outputUrl}
-                  controls
-                  autoPlay
-                  muted
-                  loop
-                  className="w-full h-full object-contain"
-                  data-testid="output-video-preview"
-                >
-                  Your browser does not support the video tag.
-                </video>
-                <div className="absolute top-3 right-3 px-2 py-1 rounded bg-green-500/80 text-xs font-medium flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" />
-                  Watermark Free
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Before - Original Video */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-400">
+                  <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400">BEFORE</span>
+                  Original with Watermark
                 </div>
+                {inputUrl ? (
+                  <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
+                    <video
+                      src={inputUrl}
+                      controls
+                      muted
+                      loop
+                      className="w-full h-full object-contain"
+                      data-testid="input-video-preview"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                    <div className="absolute top-3 right-3 px-2 py-1 rounded bg-red-500/80 text-xs font-medium">
+                      With Watermark
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-white/5 aspect-video flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                      <Video className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Original not available</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="rounded-xl bg-white/5 aspect-video mb-6 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Video preview loading...</p>
+
+              {/* After - Processed Video */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-400">
+                  <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400">AFTER</span>
+                  Watermark Removed
                 </div>
+                {outputUrl ? (
+                  <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
+                    <video
+                      src={outputUrl}
+                      controls
+                      autoPlay
+                      muted
+                      loop
+                      className="w-full h-full object-contain"
+                      data-testid="output-video-preview"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                    <div className="absolute top-3 right-3 px-2 py-1 rounded bg-green-500/80 text-xs font-medium flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Clean
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-white/5 aspect-video flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                      <Video className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Loading...</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Action buttons */}
             <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => router.push("/app/jobs")}
+                data-testid="view-jobs-button"
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+              >
+                <Eye className="w-5 h-5" />
+                View All Jobs
+              </button>
               {outputUrl && (
                 <a
                   href={outputUrl}
@@ -465,14 +528,6 @@ export default function RemoveWatermarkPage() {
                   Download
                 </a>
               )}
-              <button
-                onClick={() => router.push("/app/jobs")}
-                data-testid="view-jobs-button"
-                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium ${!outputUrl ? 'col-span-2' : ''}`}
-              >
-                <Eye className="w-5 h-5" />
-                View All Jobs
-              </button>
             </div>
           </div>
 

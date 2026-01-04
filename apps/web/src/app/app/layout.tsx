@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Home, Video, History, Coins, Settings, CreditCard, LogOut, Sparkles, Zap } from "lucide-react";
+import { Home, Video, History, Coins, Settings, CreditCard, LogOut, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { AnimatedCredits } from "@/components/AnimatedCredits";
 
 async function getUser() {
   const supabase = await createClient();
@@ -101,13 +102,7 @@ export default async function AppLayout({
         </nav>
 
         <div className="p-4 border-t border-white/10">
-          <Link href="/app/credits" className="block p-3 rounded-lg bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 mb-4 hover:from-indigo-500/20 hover:to-purple-500/20 transition">
-            <div className="flex items-center gap-2 text-indigo-400 text-sm font-medium mb-1">
-              <Zap className="w-4 h-4" />
-              Credits Available
-            </div>
-            <div className="text-2xl font-bold">{credits}</div>
-          </Link>
+          <AnimatedCredits initialCredits={credits} />
           
           <div className="text-sm text-gray-400 mb-2 truncate">
             {user.email}
