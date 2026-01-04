@@ -1,6 +1,4 @@
 # BlankLogo Render Blueprint
-# Deploy with: render blueprint apply
-
 services:
   # Redis Database
   - type: redis
@@ -9,13 +7,14 @@ services:
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
-  # API Server (Docker)
+  # API Server
   - type: web
     name: blanklogo-api
-    runtime: docker
+    runtime: node
     plan: free
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: .
+    region: oregon
+    buildCommand: "npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/api build"
+    startCommand: "node apps/api/dist/index.js"
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -34,13 +33,14 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
-  # Background Worker (Docker)
+  # Background Worker
   - type: web
     name: blanklogo-worker
-    runtime: docker
+    runtime: node
     plan: free
-    dockerfilePath: ./apps/worker/Dockerfile
-    dockerContext: .
+    region: oregon
+    buildCommand: "npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/worker build"
+    startCommand: "node apps/worker/dist/index.js"
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -59,13 +59,14 @@ services:
       - key: SUPABASE_SERVICE_KEY
         sync: false
 
-  # Web App (Next.js Docker)
+  # Web App (Next.js)
   - type: web
     name: blanklogo-web
-    runtime: docker
+    runtime: node
     plan: free
-    dockerfilePath: ./apps/web/Dockerfile
-    dockerContext: .
+    region: oregon
+    buildCommand: "npm install -g pnpm && pnpm install && pnpm --filter @blanklogo/web build"
+    startCommand: "cd apps/web && npm start"
     envVars:
       - key: NODE_ENV
         value: production
