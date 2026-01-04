@@ -112,7 +112,8 @@ describe("Worker Integration Tests", () => {
       for (const platform of data.platforms) {
         expect(platform.id).toBeDefined();
         expect(platform.name).toBeDefined();
-        expect(platform.default_crop_pixels).toBeGreaterThan(0);
+        // Some platforms (auto, instagram, facebook, meta) have 0 crop pixels
+        expect(platform.default_crop_pixels).toBeGreaterThanOrEqual(0);
         expect(platform.crop_position).toMatch(/top|bottom|left|right/);
         
         console.log(`   ${platform.name}: ${platform.default_crop_pixels}px (${platform.crop_position})`);
