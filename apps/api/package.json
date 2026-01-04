@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "lsof -ti:8989 | xargs kill -9 2>/dev/null || true; tsx watch src/index.ts",
+    "dev:safe": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "kill-port": "lsof -ti:8989 | xargs kill -9 2>/dev/null || echo 'Port 8989 is free'"
   },
   "dependencies": {
     "@blanklogo/shared": "workspace:*",

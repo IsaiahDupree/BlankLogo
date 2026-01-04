@@ -357,20 +357,21 @@ describe("Assets RLS", () => {
 });
 
 // ============================================
-// Credit Ledger RLS Tests
+// BlankLogo Credit Ledger RLS Tests
 // ============================================
 
 describe("Credit Ledger RLS", () => {
   let testLedgerId: string;
+  const testUserId = "8d954cc4-a5c3-4bb8-b6ef-1cd38f24af28"; // isaiahdupree33@gmail.com
 
   beforeAll(async () => {
     const { data: entry } = await adminClient
-      .from("credit_ledger")
+      .from("bl_credit_ledger")
       .insert({
-        user_id: user1Id,
-        type: "admin_adjust",
+        user_id: testUserId,
+        type: "bonus",
         amount: 50,
-        note: "Test credits",
+        note: "Test credits for RLS",
       })
       .select()
       .single();
@@ -378,34 +379,35 @@ describe("Credit Ledger RLS", () => {
   });
 
   afterAll(async () => {
-    await adminClient.from("credit_ledger").delete().eq("id", testLedgerId);
+    if (testLedgerId) {
+      await adminClient.from("bl_credit_ledger").delete().eq("id", testLedgerId);
+    }
   });
 
   it("ledger entry belongs to correct user", async () => {
     const { data: entry } = await adminClient
-      .from("credit_ledger")
+      .from("bl_credit_ledger")
       .select("user_id, amount")
       .eq("id", testLedgerId)
       .single();
 
-    expect(entry?.user_id).toBe(user1Id);
+    expect(entry?.user_id).toBe(testUserId);
     expect(entry?.amount).toBe(50);
   });
 
   it("user2 has no access to user1 ledger entries", async () => {
-    if (!setupSuccessful || !testLedgerId) {
+    if (!testLedgerId) {
       console.log("Skipping - setup failed");
       return;
     }
     
     // Verify ledger entry ownership is tracked
     const { data: allEntries } = await adminClient
-      .from("credit_ledger")
+      .from("bl_credit_ledger")
       .select("user_id")
       .eq("id", testLedgerId);
 
-    expect(allEntries?.[0]?.user_id).toBe(user1Id);
-    // Note: In test env with single user, we just verify ownership is set correctly
+    expect(allEntries?.[0]?.user_id).toBe(testUserId);
     expect(allEntries?.[0]?.user_id).toBeDefined();
   });
 });

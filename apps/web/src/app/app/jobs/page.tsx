@@ -129,18 +129,19 @@ export default async function JobsPage() {
           </div>
           <div className="grid gap-4">
             {jobs.map((job: BlJob) => (
-              <div
+              <Link
                 key={job.id}
-                className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition"
+                href={`/app/jobs/${job.id}`}
+                className="block p-4 rounded-xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-white/[0.07] transition cursor-pointer group"
               >
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
-                    <h3 className="font-semibold mb-1">
+                    <h3 className="font-semibold mb-1 group-hover:text-indigo-300 transition">
                       {job.input_filename || `Job ${job.id.slice(0, 8)}`}
                     </h3>
                     <div className="flex items-center gap-4 text-sm text-gray-400">
                       <span className="capitalize px-2 py-0.5 rounded bg-white/5">
-                        {job.platform}
+                        {job.platform === "auto" ? "Auto-Detect" : job.platform}
                       </span>
                       <span>
                         {new Date(job.created_at).toLocaleDateString()} at{" "}
@@ -160,7 +161,7 @@ export default async function JobsPage() {
                         href={job.output_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-sm hover:bg-green-500/30 transition"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-sm hover:bg-green-500/30 transition z-10"
                       >
                         <Download className="w-4 h-4" />
                         Download
@@ -171,9 +172,10 @@ export default async function JobsPage() {
                         {job.error_message}
                       </span>
                     )}
+                    <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-indigo-400 transition" />
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

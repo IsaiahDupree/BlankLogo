@@ -1,330 +1,317 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY } from "./config";
 
 // ============================================
-// Database RPC Tests
+// BlankLogo Credit System RPC Tests
 // ============================================
 
 let supabase: SupabaseClient;
-let testUserId: string;
-let testProjectId: string;
+const testUserId = "8d954cc4-a5c3-4bb8-b6ef-1cd38f24af28"; // isaiahdupree33@gmail.com
 
 beforeAll(async () => {
   supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-  // Use existing test user (foreign key constraint requires real user)
-  testUserId = "e3020b92-641f-49da-a9d1-b37c8daf56b0"; // isaiahdupree33@gmail.com
-});
-
-beforeEach(async () => {
-  // Create a fresh test project for each test
-  const { data: project } = await supabase
-    .from("projects")
-    .insert({
-      user_id: testUserId,
-      title: `Test Project ${Date.now()}`,
-      niche_preset: "educational",
-      status: "draft",
-    })
-    .select()
-    .single();
-
-  testProjectId = project?.id || "";
 });
 
 afterAll(async () => {
-  // Cleanup test data
-  if (testProjectId) {
-    await supabase.from("jobs").delete().eq("project_id", testProjectId);
-    await supabase.from("projects").delete().eq("id", testProjectId);
-  }
+  // Cleanup test credit entries
+  await supabase
+    .from("bl_credit_ledger")
+    .delete()
+    .eq("note", "Test credit entry");
+    
+  // Cleanup test jobs
+  await supabase
+    .from("bl_jobs")
+    .delete()
+    .like("id", "test_%");
 });
 
 // ============================================
-// claim_next_job RPC Tests
+// bl_get_credit_balance Tests
 // ============================================
 
-describe("claim_next_job RPC", () => {
-  it("claims only QUEUED jobs", async () => {
-    // Create a QUEUED job
-    const { data: job } = await supabase
-      .from("jobs")
-      .insert({
-        project_id: testProjectId,
-        user_id: testUserId,
-        status: "QUEUED",
-        progress: 0,
-      })
-      .select()
-      .single();
-
-    expect(job).toBeDefined();
-
-    // Claim the job
-    const { data: claimed, error } = await supabase.rpc("claim_next_job", {
-      p_worker_id: "test-worker-1",
-      p_max_active_per_user: 5,
+describe("bl_get_credit_balance RPC", () => {
+  it("returns user credit balance", async () => {
+    const { data: balance, error } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
     });
 
     expect(error).toBeNull();
-    expect(claimed).toBeDefined();
-
-    if (Array.isArray(claimed) && claimed.length > 0) {
-      expect(claimed[0].job_id).toBe(job?.id);
-    }
-
-    // Verify job status changed
-    const { data: updatedJob } = await supabase
-      .from("jobs")
-      .select("status, worker_id, claimed_at")
-      .eq("id", job?.id)
-      .single();
-
-    // RPC may use different status names or not update status on claim
-    // Just verify the job exists and claim was attempted
-    expect(updatedJob).toBeDefined();
-    // Worker assignment depends on RPC implementation
-    if (updatedJob?.status === "CLAIMED") {
-      expect(updatedJob?.worker_id).toBe("test-worker-1");
-    }
+    expect(typeof balance).toBe("number");
+    expect(balance).toBeGreaterThanOrEqual(0);
   });
 
-  it("does not claim non-QUEUED jobs", async () => {
-    // Create a job in SCRIPTING status
-    await supabase.from("jobs").insert({
-      project_id: testProjectId,
-      user_id: testUserId,
-      status: "SCRIPTING",
-      progress: 10,
+  it("returns 0 for user with no credits", async () => {
+    // Use a non-existent user ID
+    const { data: balance, error } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: "00000000-0000-0000-0000-000000000000",
     });
 
-    // Try to claim - should return null or empty
-    const { data: claimed } = await supabase.rpc("claim_next_job", {
-      p_worker_id: "test-worker-2",
-      p_max_active_per_user: 5,
-    });
-
-    // Should not claim the SCRIPTING job
-    const isClaimedEmpty = !claimed || (Array.isArray(claimed) && claimed.length === 0);
-    expect(isClaimedEmpty).toBe(true);
-  });
-
-  it("respects p_max_active_per_user limit", async () => {
-    // Create multiple QUEUED jobs for same user
-    await supabase.from("jobs").insert([
-      { project_id: testProjectId, user_id: testUserId, status: "CLAIMED", progress: 0 },
-      { project_id: testProjectId, user_id: testUserId, status: "QUEUED", progress: 0 },
-    ]);
-
-    // Try to claim with max_active = 1 (user already has 1 CLAIMED)
-    const { data: claimed } = await supabase.rpc("claim_next_job", {
-      p_worker_id: "test-worker-3",
-      p_max_active_per_user: 1,
-    });
-
-    // Should not claim because user already has 1 active job
-    const isClaimedEmpty = !claimed || (Array.isArray(claimed) && claimed.length === 0);
-    expect(isClaimedEmpty).toBe(true);
-  });
-
-  it("increments attempt_count on claim", async () => {
-    const { data: job } = await supabase
-      .from("jobs")
-      .insert({
-        project_id: testProjectId,
-        user_id: testUserId,
-        status: "QUEUED",
-        progress: 0,
-        attempt_count: 0,
-      })
-      .select()
-      .single();
-
-    await supabase.rpc("claim_next_job", {
-      p_worker_id: "test-worker-4",
-      p_max_active_per_user: 5,
-    });
-
-    const { data: updatedJob } = await supabase
-      .from("jobs")
-      .select("attempt_count")
-      .eq("id", job?.id)
-      .single();
-
-    // RPC may or may not increment attempt_count depending on implementation
-    expect(updatedJob?.attempt_count).toBeGreaterThanOrEqual(0);
-  });
-
-  it("uses SKIP LOCKED for concurrent claims", async () => {
-    // Create two QUEUED jobs
-    const { data: jobs } = await supabase
-      .from("jobs")
-      .insert([
-        { project_id: testProjectId, user_id: testUserId, status: "QUEUED", progress: 0 },
-        { project_id: testProjectId, user_id: testUserId, status: "QUEUED", progress: 0 },
-      ])
-      .select();
-
-    expect(jobs?.length).toBe(2);
-
-    // Simulate concurrent claims
-    const [claim1, claim2] = await Promise.all([
-      supabase.rpc("claim_next_job", { p_worker_id: "worker-a", p_max_active_per_user: 5 }),
-      supabase.rpc("claim_next_job", { p_worker_id: "worker-b", p_max_active_per_user: 5 }),
-    ]);
-
-    // Both should succeed with different jobs (or one gets nothing if only 1 job)
-    const claimed1 = Array.isArray(claim1.data) ? claim1.data[0]?.job_id : null;
-    const claimed2 = Array.isArray(claim2.data) ? claim2.data[0]?.job_id : null;
-
-    // They should not claim the same job
-    if (claimed1 && claimed2) {
-      expect(claimed1).not.toBe(claimed2);
-    }
+    expect(error).toBeNull();
+    expect(balance).toBe(0);
   });
 });
 
 // ============================================
-// requeue_stale_jobs RPC Tests
+// bl_reserve_credits Tests
 // ============================================
 
-describe("requeue_stale_jobs RPC", () => {
-  it("requeues jobs with stale heartbeat", async () => {
-    // Create a job with old heartbeat
-    const staleTime = new Date(Date.now() - 20 * 60 * 1000).toISOString(); // 20 min ago
+describe("bl_reserve_credits RPC", () => {
+  it("reserves credits for a job", async () => {
+    const testJobId = `test_reserve_${Date.now()}`;
+    
+    // Get initial balance FIRST
+    const { data: initialBalance } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
+    });
+    
+    // Create a test job first (must exist before reserve)
+    const { error: jobError } = await supabase.from("bl_jobs").insert({
+      id: testJobId,
+      user_id: testUserId,
+      status: "queued",
+      platform: "test",
+      input_url: "https://example.com/test.mp4",
+    });
+    
+    if (jobError) {
+      console.error("Failed to create job:", jobError);
+      throw new Error(`Failed to create job: ${jobError.message}`);
+    }
 
-    const { data: job } = await supabase
-      .from("jobs")
-      .insert({
-        project_id: testProjectId,
-        user_id: testUserId,
-        status: "SCRIPTING",
-        progress: 10,
-        worker_id: "old-worker",
-        heartbeat_at: staleTime,
-        attempt_count: 0,
-      })
-      .select()
-      .single();
-
-    // Requeue stale jobs (threshold 10 minutes)
-    const { data: requeued } = await supabase.rpc("requeue_stale_jobs", {
-      p_stale_minutes: 10,
-      p_max_attempts: 3,
+    // Reserve credits
+    const { error: reserveError } = await supabase.rpc("bl_reserve_credits", {
+      p_user_id: testUserId,
+      p_job_id: testJobId,
+      p_amount: 1,
     });
 
-    // RPC returns count or object depending on implementation
-    const requeuedCount = typeof requeued === 'number' ? requeued : (requeued as any)?.count ?? 0;
-    expect(requeuedCount).toBeGreaterThanOrEqual(0);
+    expect(reserveError).toBeNull();
 
-    // Verify job was requeued
-    const { data: updatedJob } = await supabase
-      .from("jobs")
-      .select("status, worker_id, error_code")
-      .eq("id", job?.id)
-      .single();
+    // Check balance decreased by 1
+    const { data: newBalance } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
+    });
 
-    expect(updatedJob?.status).toBe("QUEUED");
-    expect(updatedJob?.worker_id).toBeNull();
+    // Balance should decrease (may have race conditions with parallel tests)
+    expect(newBalance).toBeLessThan(initialBalance);
+
+    // Cleanup
+    await supabase.from("bl_credit_ledger").delete().eq("job_id", testJobId);
+    await supabase.from("bl_jobs").delete().eq("id", testJobId);
   });
 
-  it("does not requeue jobs with recent heartbeat", async () => {
-    const recentTime = new Date().toISOString();
+  it("fails when insufficient credits", async () => {
+    const testJobId = `test_insufficient_${Date.now()}`;
 
-    const { data: job } = await supabase
-      .from("jobs")
+    // Create a test job
+    await supabase.from("bl_jobs").insert({
+      id: testJobId,
+      user_id: testUserId,
+      status: "queued",
+      platform: "test",
+      input_url: "https://example.com/test.mp4",
+    });
+
+    // Try to reserve more credits than available
+    const { error } = await supabase.rpc("bl_reserve_credits", {
+      p_user_id: testUserId,
+      p_job_id: testJobId,
+      p_amount: 99999,
+    });
+
+    // Should fail with insufficient credits error
+    expect(error).toBeDefined();
+    expect(error?.message).toContain("Insufficient");
+
+    // Cleanup
+    await supabase.from("bl_jobs").delete().eq("id", testJobId);
+  });
+});
+
+// ============================================
+// bl_release_credits Tests
+// ============================================
+
+describe("bl_release_credits RPC", () => {
+  it("releases reserved credits back to user", async () => {
+    const testJobId = `test_release_${Date.now()}`;
+
+    // Add test credits
+    await supabase.from("bl_credit_ledger").insert({
+      user_id: testUserId,
+      type: "bonus",
+      amount: 5,
+      note: "Test credit entry",
+    });
+
+    // Create job and reserve credits
+    await supabase.from("bl_jobs").insert({
+      id: testJobId,
+      user_id: testUserId,
+      status: "queued",
+      platform: "test",
+      input_url: "https://example.com/test.mp4",
+      credits_reserved: 0,
+    });
+
+    await supabase.rpc("bl_reserve_credits", {
+      p_user_id: testUserId,
+      p_job_id: testJobId,
+      p_amount: 2,
+    });
+
+    // Get balance after reserve
+    const { data: balanceAfterReserve } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
+    });
+
+    // Release credits
+    const { error: releaseError } = await supabase.rpc("bl_release_credits", {
+      p_user_id: testUserId,
+      p_job_id: testJobId,
+    });
+
+    expect(releaseError).toBeNull();
+
+    // Check balance increased back
+    const { data: balanceAfterRelease } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
+    });
+
+    expect(balanceAfterRelease).toBe(balanceAfterReserve + 2);
+
+    // Cleanup
+    await supabase.from("bl_jobs").delete().eq("id", testJobId);
+  });
+});
+
+// ============================================
+// bl_finalize_credits Tests
+// ============================================
+
+describe("bl_finalize_credits RPC", () => {
+  it("finalizes credits on job completion", async () => {
+    const testJobId = `test_finalize_${Date.now()}`;
+
+    // Add test credits
+    await supabase.from("bl_credit_ledger").insert({
+      user_id: testUserId,
+      type: "bonus",
+      amount: 5,
+      note: "Test credit entry",
+    });
+
+    // Create job and reserve credits
+    await supabase.from("bl_jobs").insert({
+      id: testJobId,
+      user_id: testUserId,
+      status: "processing",
+      platform: "test",
+      input_url: "https://example.com/test.mp4",
+      credits_reserved: 0,
+    });
+
+    await supabase.rpc("bl_reserve_credits", {
+      p_user_id: testUserId,
+      p_job_id: testJobId,
+      p_amount: 3,
+    });
+
+    // Get balance after reserve
+    const { data: balanceAfterReserve } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
+    });
+
+    // Finalize with actual cost of 2 (should refund 1)
+    const { error: finalizeError } = await supabase.rpc("bl_finalize_credits", {
+      p_user_id: testUserId,
+      p_job_id: testJobId,
+      p_final_cost: 2,
+    });
+
+    expect(finalizeError).toBeNull();
+
+    // Check balance (should have 1 credit refunded)
+    const { data: balanceAfterFinalize } = await supabase.rpc("bl_get_credit_balance", {
+      p_user_id: testUserId,
+    });
+
+    expect(balanceAfterFinalize).toBe(balanceAfterReserve + 1);
+
+    // Cleanup
+    await supabase.from("bl_jobs").delete().eq("id", testJobId);
+  });
+});
+
+// ============================================
+// bl_jobs Table Tests
+// ============================================
+
+describe("bl_jobs table", () => {
+  it("can create a job", async () => {
+    const testJobId = `test_create_${Date.now()}`;
+
+    const { data: job, error } = await supabase
+      .from("bl_jobs")
       .insert({
-        project_id: testProjectId,
+        id: testJobId,
         user_id: testUserId,
-        status: "SCRIPTING",
-        progress: 10,
-        worker_id: "active-worker",
-        heartbeat_at: recentTime,
-        attempt_count: 0,
+        status: "queued",
+        platform: "sora",
+        input_url: "https://example.com/video.mp4",
       })
       .select()
       .single();
 
-    await supabase.rpc("requeue_stale_jobs", {
-      p_stale_minutes: 10,
-      p_max_attempts: 3,
+    expect(error).toBeNull();
+    expect(job).toBeDefined();
+    expect(job?.id).toBe(testJobId);
+    expect(job?.status).toBe("queued");
+
+    // Cleanup
+    await supabase.from("bl_jobs").delete().eq("id", testJobId);
+  });
+
+  it("can update job status", async () => {
+    const testJobId = `test_update_${Date.now()}`;
+
+    await supabase.from("bl_jobs").insert({
+      id: testJobId,
+      user_id: testUserId,
+      status: "queued",
+      platform: "auto",
+      input_url: "https://example.com/test.mp4",
     });
 
-    // Verify job was NOT requeued
+    const { error: updateError } = await supabase
+      .from("bl_jobs")
+      .update({ status: "processing" })
+      .eq("id", testJobId);
+
+    expect(updateError).toBeNull();
+
     const { data: updatedJob } = await supabase
-      .from("jobs")
+      .from("bl_jobs")
       .select("status")
-      .eq("id", job?.id)
+      .eq("id", testJobId)
       .single();
 
-    expect(updatedJob?.status).toBe("SCRIPTING");
+    expect(updatedJob?.status).toBe("processing");
+
+    // Cleanup
+    await supabase.from("bl_jobs").delete().eq("id", testJobId);
   });
 
-  it("does not requeue jobs exceeding max attempts", async () => {
-    const staleTime = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  it("can query jobs by user", async () => {
+    const { data: jobs, error } = await supabase
+      .from("bl_jobs")
+      .select("*")
+      .eq("user_id", testUserId)
+      .limit(10);
 
-    const { data: job } = await supabase
-      .from("jobs")
-      .insert({
-        project_id: testProjectId,
-        user_id: testUserId,
-        status: "SCRIPTING",
-        progress: 10,
-        heartbeat_at: staleTime,
-        attempt_count: 3, // Already at max
-      })
-      .select()
-      .single();
-
-    await supabase.rpc("requeue_stale_jobs", {
-      p_stale_minutes: 10,
-      p_max_attempts: 3,
-    });
-
-    // Verify job was NOT requeued (should be marked FAILED instead)
-    const { data: updatedJob } = await supabase
-      .from("jobs")
-      .select("status")
-      .eq("id", job?.id)
-      .single();
-
-    // Job should either stay as is or be marked FAILED
-    expect(["SCRIPTING", "FAILED"]).toContain(updatedJob?.status);
-  });
-
-  it("clears worker fields on requeue", async () => {
-    const staleTime = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-
-    const { data: job } = await supabase
-      .from("jobs")
-      .insert({
-        project_id: testProjectId,
-        user_id: testUserId,
-        status: "VOICE_GEN",
-        progress: 30,
-        worker_id: "crashed-worker",
-        heartbeat_at: staleTime,
-        error_code: "ERR_PARTIAL",
-        error_message: "Previous error",
-        attempt_count: 1,
-      })
-      .select()
-      .single();
-
-    await supabase.rpc("requeue_stale_jobs", {
-      p_stale_minutes: 10,
-      p_max_attempts: 3,
-    });
-
-    const { data: updatedJob } = await supabase
-      .from("jobs")
-      .select("worker_id, error_code, error_message")
-      .eq("id", job?.id)
-      .single();
-
-    expect(updatedJob?.worker_id).toBeNull();
-    expect(updatedJob?.error_code).toBeNull();
-    expect(updatedJob?.error_message).toBeNull();
+    expect(error).toBeNull();
+    expect(Array.isArray(jobs)).toBe(true);
   });
 });

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle } from "lucide-react";
+import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Download, Play, RotateCcw, Eye } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 
@@ -11,28 +11,54 @@ function logRemove(message: string, data?: unknown) {
   console.log(`[PAGE: REMOVE] ${message}`, data !== undefined ? data : "");
 }
 
+// Processing steps for the animation
+const PROCESSING_STEPS = [
+  { id: "validating", label: "Validating video", icon: "🔍" },
+  { id: "downloading", label: "Downloading video", icon: "⬇️" },
+  { id: "analyzing", label: "Analyzing watermark", icon: "🎯" },
+  { id: "processing", label: "Removing watermark", icon: "✨" },
+  { id: "encoding", label: "Encoding output", icon: "🎬" },
+  { id: "uploading", label: "Uploading result", icon: "⬆️" },
+];
+
+// Job status type
+interface JobStatus {
+  id: string;
+  status: string;
+  progress: number;
+  output_url?: string;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const PLATFORMS = [
-  { id: "sora", name: "Sora", cropPixels: 100, color: "from-purple-500 to-pink-500" },
-  { id: "tiktok", name: "TikTok", cropPixels: 80, color: "from-cyan-500 to-blue-500" },
-  { id: "runway", name: "Runway", cropPixels: 60, color: "from-green-500 to-emerald-500" },
-  { id: "pika", name: "Pika", cropPixels: 50, color: "from-orange-500 to-red-500" },
-  { id: "kling", name: "Kling", cropPixels: 70, color: "from-blue-500 to-indigo-500" },
-  { id: "luma", name: "Luma", cropPixels: 55, color: "from-yellow-500 to-orange-500" },
-  { id: "instagram", name: "Instagram", cropPixels: 0, color: "from-pink-500 to-purple-600" },
-  { id: "facebook", name: "Facebook", cropPixels: 0, color: "from-blue-600 to-blue-800" },
-  { id: "custom", name: "Custom", cropPixels: 0, color: "from-gray-500 to-gray-600" },
+  { id: "auto", name: "Auto-Detect", cropPixels: 0, color: "from-indigo-500 to-purple-600", description: "AI automatically detects and removes the watermark", supported: true },
+  { id: "sora", name: "Sora", cropPixels: 100, color: "from-purple-500 to-pink-500", description: "OpenAI Sora videos", supported: true },
+  { id: "tiktok", name: "TikTok", cropPixels: 80, color: "from-cyan-500 to-blue-500", description: "TikTok videos", supported: true },
+  { id: "runway", name: "Runway", cropPixels: 60, color: "from-green-500 to-emerald-500", description: "Runway ML videos", supported: true },
+  { id: "pika", name: "Pika", cropPixels: 50, color: "from-orange-500 to-red-500", description: "Pika Labs videos", supported: true },
+  { id: "kling", name: "Kling", cropPixels: 70, color: "from-blue-500 to-indigo-500", description: "Kling AI videos", supported: true },
+  { id: "luma", name: "Luma", cropPixels: 55, color: "from-yellow-500 to-orange-500", description: "Luma AI videos", supported: true },
+  { id: "instagram", name: "Instagram", cropPixels: 0, color: "from-pink-500 to-purple-600", description: "Instagram Reels", supported: true },
+  { id: "facebook", name: "Facebook", cropPixels: 0, color: "from-blue-600 to-blue-800", description: "Facebook videos", supported: true },
+  { id: "custom", name: "Custom", cropPixels: 0, color: "from-gray-500 to-gray-600", description: "Set manually", supported: true },
 ];
 
 export default function RemoveWatermarkPage() {
   const [mode, setMode] = useState<"url" | "upload">("url");
   const [videoUrl, setVideoUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [platform, setPlatform] = useState("sora");
+  const [platform, setPlatform] = useState("auto");
   const [customCrop, setCustomCrop] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const router = useRouter();
   const toast = useToast();
 
@@ -41,9 +67,99 @@ export default function RemoveWatermarkPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  // Poll job status
+  const pollJobStatus = useCallback(async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8989";
+      const res = await fetch(`${apiUrl}/api/v1/jobs/${id}`, {
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const job = data.job || data;
+        setJobStatus(job);
+        logRemove("📊 Job status poll:", {
+          id: job.id,
+          status: job.status,
+          progress: job.progress,
+          error: job.error,
+          error_code: job.error_code,
+          error_message: job.error_message,
+          input_url: job.input_url,
+          output_url: job.output_url,
+        });
+
+        // Update current step based on progress
+        const progress = job.progress || 0;
+        const stepIndex = Math.min(Math.floor(progress / 17), PROCESSING_STEPS.length - 1);
+        setCurrentStep(stepIndex);
+
+        // Check if completed or failed
+        const status = job.status;
+        if (status === "completed") {
+          setIsProcessing(false);
+          setSuccess(true);
+          toast.success("Watermark removed successfully!");
+          logRemove("✅ Job completed!", { output_url: job.output_url });
+        } else if (status === "failed") {
+          setIsProcessing(false);
+          const errorMsg = job.error || job.error_message || data.error || "Processing failed";
+          setError(errorMsg);
+          toast.error(errorMsg);
+          logRemove("❌ Job failed:", { 
+            error: errorMsg,
+            error_code: job.error_code,
+            error_message: job.error_message,
+            fullJob: job 
+          });
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        logRemove("❌ Job poll failed:", { status: res.status, error: errorData });
+      }
+    } catch (err) {
+      logRemove("❌ Error polling job:", err);
+    }
+  }, [supabase, toast]);
+
+  // Poll effect
+  useEffect(() => {
+    if (!jobId || !isProcessing) return;
+
+    const interval = setInterval(() => {
+      pollJobStatus(jobId);
+    }, 2000);
+
+    // Initial poll
+    pollJobStatus(jobId);
+
+    return () => clearInterval(interval);
+  }, [jobId, isProcessing, pollJobStatus]);
+
   useEffect(() => {
     logRemove("✨ Remove watermark page loaded");
-  }, []);
+    
+    // Fetch user's credit balance
+    async function fetchCredits() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data } = await supabase.rpc("get_credit_balance", { p_user_id: session.user.id });
+          setCredits(data ?? 0);
+          logRemove("💰 Credits loaded:", data);
+        }
+      } catch (err) {
+        logRemove("❌ Failed to fetch credits:", err);
+      }
+    }
+    fetchCredits();
+  }, [supabase]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,7 +182,7 @@ export default function RemoveWatermarkPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logRemove("🚀 Submitting job...", { mode, platform, videoUrl: videoUrl?.slice(0, 50) });
+    logRemove("🚀 Submitting job...", { mode, platform, videoUrl, credits });
     
     setLoading(true);
     setError(null);
@@ -88,6 +204,8 @@ export default function RemoveWatermarkPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8989";
       
       if (mode === "url") {
+        logRemove("🌐 Calling API:", { url: `${apiUrl}/api/v1/jobs`, videoUrl, platform, cropPixels });
+        
         const res = await fetch(`${apiUrl}/api/v1/jobs`, {
           method: "POST",
           headers: {
@@ -102,14 +220,29 @@ export default function RemoveWatermarkPage() {
         });
 
         const data = await res.json();
-        logRemove("📦 API response:", { status: res.status, jobId: data.jobId });
+        logRemove("📦 API response:", { 
+          status: res.status, 
+          statusText: res.statusText,
+          jobId: data.jobId,
+          error: data.error,
+          message: data.message,
+          fullResponse: data 
+        });
 
         if (!res.ok) {
-          throw new Error(data.error || "Failed to create job");
+          logRemove("❌ API error details:", { 
+            status: res.status, 
+            error: data.error, 
+            message: data.message,
+            credits_required: data.credits_required,
+            credits_available: data.credits_available
+          });
+          throw new Error(data.error || data.message || "Failed to create job");
         }
 
         setJobId(data.jobId);
-        setSuccess(true);
+        setIsProcessing(true);
+        setCurrentStep(0);
         logRemove("✅ Job created successfully:", data.jobId);
       } else if (mode === "upload" && selectedFile) {
         const formData = new FormData();
@@ -133,7 +266,8 @@ export default function RemoveWatermarkPage() {
         }
 
         setJobId(data.jobId);
-        setSuccess(true);
+        setIsProcessing(true);
+        setCurrentStep(0);
         logRemove("✅ Upload successful:", data.jobId);
       }
     } catch (err) {
@@ -146,34 +280,185 @@ export default function RemoveWatermarkPage() {
     }
   };
 
-  if (success && jobId) {
+  // Processing state - show cool animation
+  if (isProcessing && jobId) {
+    const progress = jobStatus?.progress || 0;
+    
     return (
       <div className="p-8 max-w-2xl mx-auto">
-        <div className="text-center py-16 px-6 rounded-2xl bg-green-500/10 border border-green-500/20">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-400" />
+        <div className="rounded-2xl bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/20 overflow-hidden">
+          {/* Animated header */}
+          <div className="relative p-8 text-center overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-pulse" />
+            <div className="relative">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center animate-pulse">
+                <Sparkles className="w-10 h-10 text-white animate-spin" style={{ animationDuration: "3s" }} />
+              </div>
+              <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                Removing Watermark...
+              </h2>
+              <p className="text-gray-400">
+                This usually takes 30-60 seconds
+              </p>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold mb-2 text-green-400">Job Created!</h2>
-          <p className="text-gray-400 mb-6">
-            Your watermark removal job has been queued. We&apos;ll process it shortly.
-          </p>
-          <div className="flex items-center justify-center gap-4">
+
+          {/* Progress bar */}
+          <div className="px-8 pb-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-400">Progress</span>
+              <span className="text-indigo-400 font-mono">{progress}%</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.max(progress, 5)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Processing steps */}
+          <div className="px-8 pb-8">
+            <div className="space-y-3">
+              {PROCESSING_STEPS.map((step, index) => {
+                const isActive = index === currentStep;
+                const isComplete = index < currentStep;
+                
+                return (
+                  <div 
+                    key={step.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                      isActive 
+                        ? "bg-indigo-500/20 border border-indigo-500/30" 
+                        : isComplete 
+                          ? "bg-green-500/10 border border-green-500/20" 
+                          : "bg-white/5 border border-transparent"
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${
+                      isActive ? "animate-bounce" : ""
+                    }`}>
+                      {isComplete ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        step.icon
+                      )}
+                    </div>
+                    <span className={`font-medium ${
+                      isActive ? "text-indigo-300" : isComplete ? "text-green-400" : "text-gray-500"
+                    }`}>
+                      {step.label}
+                    </span>
+                    {isActive && (
+                      <Loader2 className="w-4 h-4 ml-auto text-indigo-400 animate-spin" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cancel option */}
+          <div className="px-8 pb-8 text-center">
             <button
               onClick={() => router.push("/app/jobs")}
-              className="px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+              className="text-sm text-gray-500 hover:text-gray-300 transition"
             >
-              View Jobs
+              View in Jobs page →
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Success state - show completed video
+  if (success && jobId) {
+    const outputUrl = jobStatus?.output_url;
+    
+    return (
+      <div className="p-8 max-w-2xl mx-auto">
+        <div className="rounded-2xl bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/20 overflow-hidden">
+          {/* Success header */}
+          <div className="p-6 text-center border-b border-green-500/20">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-400" />
+            </div>
+            <h2 className="text-2xl font-bold mb-1 text-green-400">Watermark Removed!</h2>
+            <p className="text-gray-400 text-sm">Your video is ready to download</p>
+          </div>
+
+          {/* Video preview */}
+          <div className="p-6">
+            {outputUrl ? (
+              <div className="relative rounded-xl overflow-hidden bg-black aspect-video mb-6">
+                <video
+                  src={outputUrl}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  className="w-full h-full object-contain"
+                  data-testid="output-video-preview"
+                >
+                  Your browser does not support the video tag.
+                </video>
+                <div className="absolute top-3 right-3 px-2 py-1 rounded bg-green-500/80 text-xs font-medium flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Watermark Free
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-white/5 aspect-video mb-6 flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Video preview loading...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              {outputUrl && (
+                <a
+                  href={outputUrl}
+                  download
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-green-600 hover:bg-green-500 transition font-medium"
+                  data-testid="download-button"
+                >
+                  <Download className="w-5 h-5" />
+                  Download
+                </a>
+              )}
+              <button
+                onClick={() => router.push("/app/jobs")}
+                data-testid="view-jobs-button"
+                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium ${!outputUrl ? 'col-span-2' : ''}`}
+              >
+                <Eye className="w-5 h-5" />
+                View All Jobs
+              </button>
+            </div>
+          </div>
+
+          {/* Remove another */}
+          <div className="px-6 pb-6">
             <button
               onClick={() => {
                 setSuccess(false);
                 setJobId(null);
+                setJobStatus(null);
+                setIsProcessing(false);
                 setVideoUrl("");
                 setSelectedFile(null);
+                setError(null);
+                setCurrentStep(0);
               }}
-              className="px-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 transition font-medium"
+              data-testid="remove-another-button"
+              className="w-full py-3 rounded-lg bg-white/5 hover:bg-white/10 transition font-medium flex items-center justify-center gap-2"
             >
-              Remove Another
+              <RotateCcw className="w-4 h-4" />
+              Remove Another Watermark
             </button>
           </div>
         </div>
@@ -192,6 +477,28 @@ export default function RemoveWatermarkPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Zero Credits Warning */}
+        {credits === 0 && (
+          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold">You have 0 credits</div>
+              <div className="text-sm text-amber-400/80">Purchase credits to remove watermarks from your videos.</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/app/credits")}
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium transition text-sm"
+            >
+              Buy Credits
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
             <X className="w-4 h-4" />
@@ -204,6 +511,7 @@ export default function RemoveWatermarkPage() {
           <button
             type="button"
             onClick={() => setMode("url")}
+            data-testid="mode-url"
             className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
               mode === "url" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
             }`}
@@ -214,6 +522,7 @@ export default function RemoveWatermarkPage() {
           <button
             type="button"
             onClick={() => setMode("upload")}
+            data-testid="mode-upload"
             className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
               mode === "upload" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
             }`}
@@ -232,6 +541,7 @@ export default function RemoveWatermarkPage() {
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
               placeholder="https://example.com/video.mp4"
+              data-testid="video-url-input"
               className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition"
               required={mode === "url"}
             />
@@ -288,22 +598,51 @@ export default function RemoveWatermarkPage() {
         {/* Platform Selection */}
         <div>
           <label className="block text-sm font-medium mb-3">Select Platform</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {PLATFORMS.map((p) => (
+          
+          {/* Auto-Detect - Featured Option */}
+          <button
+            type="button"
+            onClick={() => setPlatform("auto")}
+            data-testid="platform-auto"
+            className={`w-full mb-4 p-4 rounded-xl border text-left transition flex items-center gap-4 ${
+              platform === "auto"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 border-transparent text-white"
+                : "bg-white/5 border-white/10 text-gray-300 hover:border-indigo-500/50 hover:bg-indigo-500/10"
+            }`}
+          >
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              platform === "auto" ? "bg-white/20" : "bg-indigo-500/20"
+            }`}>
+              <Sparkles className={`w-6 h-6 ${platform === "auto" ? "text-white" : "text-indigo-400"}`} />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-lg">Auto-Detect</div>
+              <div className={`text-sm ${platform === "auto" ? "text-white/80" : "text-gray-400"}`}>
+                AI automatically detects and removes the watermark
+              </div>
+            </div>
+            {platform === "auto" && (
+              <CheckCircle className="w-6 h-6 text-white" />
+            )}
+          </button>
+
+          {/* Other platforms in grid */}
+          <div className="text-xs text-gray-500 mb-2">Or select a specific platform:</div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {PLATFORMS.filter(p => p.id !== "auto").map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => setPlatform(p.id)}
-                className={`p-3 rounded-lg border text-center transition ${
+                data-testid={`platform-${p.id}`}
+                className={`p-2 rounded-lg border text-center transition ${
                   platform === p.id
                     ? `bg-gradient-to-r ${p.color} border-transparent text-white`
                     : "bg-white/5 border-white/10 text-gray-300 hover:border-white/30"
                 }`}
               >
-                <div className="font-medium">{p.name}</div>
-                {p.id !== "custom" && (
-                  <div className="text-xs opacity-75">{p.cropPixels}px crop</div>
-                )}
+                <div className="font-medium text-sm">{p.name}</div>
+                {p.supported && <div className="text-xs opacity-75 text-green-400">✓ Supported</div>}
               </button>
             ))}
           </div>
@@ -334,6 +673,7 @@ export default function RemoveWatermarkPage() {
         <button
           type="submit"
           disabled={loading || (mode === "url" && !videoUrl) || (mode === "upload" && !selectedFile)}
+          data-testid="submit-remove-watermark"
           className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold flex items-center justify-center gap-2"
         >
           {loading ? (

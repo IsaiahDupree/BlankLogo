@@ -447,6 +447,7 @@ interface JobStatus {
 
 // Platform-specific crop presets
 const PLATFORM_PRESETS: Record<string, { cropPixels: number; cropPosition: 'bottom' | 'top' }> = {
+  auto: { cropPixels: 0, cropPosition: 'bottom' },       // Auto-detect watermark
   sora: { cropPixels: 100, cropPosition: 'bottom' },
   tiktok: { cropPixels: 80, cropPosition: 'bottom' },
   runway: { cropPixels: 60, cropPosition: 'bottom' },
@@ -502,6 +503,38 @@ app.get('/capabilities', (req, res) => {
       status: 'ok',
       issues: [],
     },
+  });
+});
+
+// /capabilities/download - Worker download capabilities for frontend
+app.get('/capabilities/download', (req, res) => {
+  const isCloud = !!(process.env.RAILWAY_ENVIRONMENT || process.env.VERCEL);
+  res.status(200).json({
+    methods: [
+      { name: 'direct', available: true, description: 'Direct fetch for .mp4 URLs' },
+      { name: 'curl', available: true, description: 'curl with browser headers' },
+      { name: 'puppeteer', available: true, description: 'Headless browser with stealth' },
+      { name: 'puppeteer-stealth', available: true, description: 'Cloudflare bypass' },
+      { name: 'yt-dlp', available: !process.env.VERCEL, description: '1000+ video sites' },
+      { name: 'browserless', available: !!(process.env.BROWSERLESS_URL || process.env.BROWSERLESS_TOKEN), description: 'Cloud browser service' },
+    ],
+    environment: isCloud ? 'cloud' : 'local',
+    notifications: {
+      resend: !!process.env.RESEND_API_KEY,
+      devEmail: process.env.DEV_NOTIFICATION_EMAIL ? 'configured' : 'default',
+    },
+    supported_sources: [
+      'Direct video URLs (.mp4, .webm, .mov)',
+      'YouTube, Vimeo, Twitter/X',
+      'Sora (sora.chatgpt.com)',
+      'Most video hosting platforms',
+      'File upload',
+    ],
+    tips: [
+      'For best results, right-click video → "Copy video address"',
+      'Direct .mp4 URLs are fastest',
+      'Upload files directly if URL fails',
+    ],
   });
 });
 
@@ -713,6 +746,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 // API v1 Routes
 
+// Calculate credits required for a job
+function calculateCreditsRequired(processingMode: ProcessingMode): number {
+  // Base cost is 1 credit per job
+  // Inpaint mode costs more as it's more compute intensive
+  return processingMode === 'inpaint' ? 2 : 1;
+}
+
 // Create a new watermark removal job (requires authentication)
 app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
@@ -736,8 +776,61 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
       return res.status(400).json({ error: 'Invalid processing_mode. Must be: crop, inpaint, or auto' });
     }
 
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Calculate credits required
+    const creditsRequired = calculateCreditsRequired(processing_mode as ProcessingMode);
+
+    // Check user's credit balance - try new function first, fall back to old one
+    let currentBalance = 0;
+    let balanceError = null;
+    
+    // Try new bl_get_credit_balance first
+    const { data: blBalanceData, error: blError } = await supabase.rpc('bl_get_credit_balance', {
+      p_user_id: userId,
+    });
+    
+    if (!blError) {
+      currentBalance = blBalanceData || 0;
+    } else {
+      // Fall back to original get_credit_balance function
+      const { data: origBalanceData, error: origError } = await supabase.rpc('get_credit_balance', {
+        p_user_id: userId,
+      });
+      
+      if (!origError) {
+        currentBalance = origBalanceData || 0;
+      } else {
+        // If both fail, log warning but allow job creation (credits will be handled later)
+        console.warn('[API] ⚠️ Could not check credit balance, proceeding without credit check');
+        console.warn('[API] bl_get_credit_balance error:', blError.message);
+        console.warn('[API] get_credit_balance error:', origError.message);
+        // Set a high balance to allow the job to proceed
+        currentBalance = 999;
+      }
+    }
+    
+    console.log(`[API] 💰 User credit balance: ${currentBalance}`);
+
+    if (currentBalance < creditsRequired) {
+      return res.status(402).json({ 
+        error: 'Insufficient credits',
+        credits_required: creditsRequired,
+        credits_available: currentBalance,
+        message: `You need ${creditsRequired} credit(s) but only have ${currentBalance}. Please purchase more credits.`
+      });
+    }
+
     const jobId = `job_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const preset = PLATFORM_PRESETS[platform] || PLATFORM_PRESETS.custom;
+
+    console.log(`[API] 🎬 Creating job ${jobId}`);
+    console.log(`[API] 📥 Input URL: ${video_url}`);
+    console.log(`[API] 🎯 Platform: ${platform}, Preset crop: ${preset.cropPixels}px`);
+    console.log(`[API] ✂️ Final crop: ${crop_pixels || preset.cropPixels}px at ${crop_position || preset.cropPosition}`);
 
     const jobData: JobData = {
       jobId,
@@ -749,19 +842,15 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
       processingMode: processing_mode as ProcessingMode,
       webhookUrl: webhook_url,
       metadata,
+      userId,
     };
+    
+    console.log(`[API] 📦 Job data:`, JSON.stringify(jobData, null, 2));
 
-    // Add to queue
-    if (!jobQueue) {
-      console.error('[API] ❌ Job queue not available');
-      return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
-    }
-    await jobQueue.add('remove-watermark', jobData, { jobId });
-
-    // Store job in database
-    await supabase.from('bl_jobs').insert({
+    // Store job in database first (credits_required column may not exist yet)
+    const { error: insertError } = await supabase.from('bl_jobs').insert({
       id: jobId,
-      user_id: req.user?.id,
+      user_id: userId,
       status: 'queued',
       input_url: video_url,
       input_filename: jobData.inputFilename,
@@ -772,17 +861,70 @@ app.post('/api/v1/jobs', authenticateToken, async (req: AuthenticatedRequest, re
       metadata,
     });
 
-    res.status(201).json({
+    if (insertError) {
+      console.error('[API] ❌ Error inserting job:', insertError);
+      console.error('[API] ❌ Insert error details:', JSON.stringify(insertError, null, 2));
+      return res.status(500).json({ error: 'Failed to create job', details: insertError.message });
+    }
+    
+    console.log(`[API] ✅ Job ${jobId} inserted into database`);
+
+    // Reserve credits for this job - try new function, fall back to old, or skip
+    const { error: blReserveError } = await supabase.rpc('bl_reserve_credits', {
+      p_user_id: userId,
+      p_job_id: jobId,
+      p_amount: creditsRequired,
+    });
+
+    if (blReserveError) {
+      // Try original reserve_credits function
+      const { error: origReserveError } = await supabase.rpc('reserve_credits', {
+        p_user_id: userId,
+        p_job_id: jobId,
+        p_amount: creditsRequired,
+      });
+      
+      if (origReserveError) {
+        // If both fail, log warning but continue (graceful degradation)
+        console.warn('[API] ⚠️ Could not reserve credits, proceeding without credit reservation');
+        console.warn('[API] bl_reserve_credits error:', blReserveError.message);
+        console.warn('[API] reserve_credits error:', origReserveError.message);
+      } else {
+        console.log(`[API] 💰 Reserved ${creditsRequired} credit(s) for job ${jobId} (using original function)`);
+      }
+    } else {
+      console.log(`[API] 💰 Reserved ${creditsRequired} credit(s) for job ${jobId}`);
+    }
+
+    // Add to queue
+    if (!jobQueue) {
+      console.error('[API] ❌ Job queue not available');
+      // Refund credits since queue is unavailable
+      await supabase.rpc('bl_release_credits', { p_user_id: userId, p_job_id: jobId });
+      await supabase.from('bl_jobs').delete().eq('id', jobId);
+      return res.status(503).json({ error: 'Job queue unavailable. Please try again later.' });
+    }
+    
+    console.log(`[API] 📤 Adding job ${jobId} to queue...`);
+    await jobQueue.add('remove-watermark', jobData, { jobId });
+    console.log(`[API] ✅ Job ${jobId} added to queue successfully`);
+
+    const response = {
       job_id: jobId,
+      jobId: jobId, // Also include camelCase for frontend compatibility
       status: 'queued',
       platform,
       crop_pixels: jobData.cropPixels,
+      credits_charged: creditsRequired,
       created_at: new Date().toISOString(),
       estimated_completion: new Date(Date.now() + 15000).toISOString(),
-    });
+    };
+    
+    console.log(`[API] 📤 Sending response:`, JSON.stringify(response));
+    res.status(201).json(response);
   } catch (error) {
-    console.error('Error creating job:', error);
-    res.status(500).json({ error: 'Failed to create job' });
+    console.error('[API] ❌ Error creating job:', error);
+    res.status(500).json({ error: 'Failed to create job', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -1015,29 +1157,171 @@ app.post('/api/v1/jobs/batch', authenticateToken, async (req: AuthenticatedReque
   }
 });
 
-// Delete/cancel job (requires authentication)
+// Delete/cancel job (requires authentication) - refunds credits
 app.delete('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { jobId } = req.params;
+    const userId = req.user?.id;
+
+    // Get job to check if it's cancellable and get user_id
+    const { data: job, error: fetchError } = await supabase
+      .from('bl_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single();
+
+    if (fetchError || !job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    // Only allow cancelling queued or processing jobs
+    if (!['queued', 'processing', 'validating'].includes(job.status)) {
+      return res.status(400).json({ 
+        error: 'Cannot cancel job', 
+        message: `Job is already ${job.status}` 
+      });
+    }
 
     // Remove from queue if still pending
     if (jobQueue) {
-      const job = await jobQueue.getJob(jobId);
-      if (job) {
-        await job.remove();
+      const queueJob = await jobQueue.getJob(jobId);
+      if (queueJob) {
+        await queueJob.remove();
+      }
+    }
+
+    // Refund reserved credits
+    if (job.user_id) {
+      const { error: refundError } = await supabase.rpc('bl_release_credits', {
+        p_user_id: job.user_id,
+        p_job_id: jobId,
+      });
+      if (refundError) {
+        console.error('[API] ⚠️ Error refunding credits:', refundError);
+      } else {
+        console.log(`[API] 💰 Refunded credits for cancelled job ${jobId}`);
       }
     }
 
     // Update database
     await supabase
       .from('bl_jobs')
-      .update({ status: 'cancelled' })
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
       .eq('id', jobId);
 
-    res.json({ message: 'Job cancelled', job_id: jobId });
+    res.json({ message: 'Job cancelled and credits refunded', job_id: jobId });
   } catch (error) {
     console.error('Error cancelling job:', error);
     res.status(500).json({ error: 'Failed to cancel job' });
+  }
+});
+
+// Internal endpoint: Update job status (called by worker)
+// This handles credit finalization on success or refund on failure
+app.post('/api/internal/jobs/:jobId/complete', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { 
+      status, 
+      output_url, 
+      output_filename, 
+      output_size_bytes,
+      error_message,
+      processing_time_ms 
+    } = req.body;
+
+    // Validate internal API key (simple security for internal calls)
+    const internalKey = req.headers['x-internal-key'];
+    if (internalKey !== process.env.INTERNAL_API_KEY && process.env.NODE_ENV === 'production') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get job details
+    const { data: job, error: fetchError } = await supabase
+      .from('bl_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single();
+
+    if (fetchError || !job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const userId = job.user_id;
+    const creditsRequired = job.credits_required || 1;
+
+    if (status === 'completed') {
+      // Job succeeded - finalize credits (keep them charged)
+      if (userId) {
+        const { error: finalizeError } = await supabase.rpc('bl_finalize_credits', {
+          p_user_id: userId,
+          p_job_id: jobId,
+          p_final_cost: creditsRequired,
+        });
+        if (finalizeError) {
+          console.error('[API] ⚠️ Error finalizing credits:', finalizeError);
+        } else {
+          console.log(`[API] 💰 Finalized ${creditsRequired} credit(s) for completed job ${jobId}`);
+        }
+      }
+
+      // Update job as completed
+      await supabase
+        .from('bl_jobs')
+        .update({
+          status: 'completed',
+          output_url,
+          output_filename,
+          output_size_bytes,
+          processing_time_ms,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId);
+
+      res.json({ message: 'Job completed, credits charged', job_id: jobId });
+
+    } else if (status === 'failed') {
+      // Job failed - refund credits
+      if (userId) {
+        const { error: refundError } = await supabase.rpc('bl_release_credits', {
+          p_user_id: userId,
+          p_job_id: jobId,
+        });
+        if (refundError) {
+          console.error('[API] ⚠️ Error refunding credits:', refundError);
+        } else {
+          console.log(`[API] 💰 Refunded credits for failed job ${jobId}`);
+        }
+      }
+
+      // Update job as failed
+      await supabase
+        .from('bl_jobs')
+        .update({
+          status: 'failed',
+          error_message: error_message || 'Processing failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId);
+
+      res.json({ message: 'Job failed, credits refunded', job_id: jobId });
+
+    } else {
+      // Just update status (e.g., processing)
+      await supabase
+        .from('bl_jobs')
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId);
+
+      res.json({ message: 'Job status updated', job_id: jobId, status });
+    }
+  } catch (error) {
+    console.error('Error completing job:', error);
+    res.status(500).json({ error: 'Failed to complete job' });
   }
 });
 

@@ -12,10 +12,15 @@
   },
   "dependencies": {
     "@blanklogo/shared": "workspace:*",
+    "@sparticuz/chromium": "^143.0.4",
     "@supabase/supabase-js": "^2.45.0",
     "bullmq": "^5.1.0",
     "dotenv": "^16.4.5",
     "ioredis": "^5.3.2",
+    "puppeteer-core": "^24.34.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "resend": "^4.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

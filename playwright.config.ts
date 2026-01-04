@@ -8,6 +8,10 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: [["html", { open: "never" }], ["list"]],
   timeout: 60000,
+  
+  // Global setup - checks services are healthy before running tests
+  globalSetup: process.env.SKIP_HEALTH_CHECK ? undefined : "./tests/global-setup.ts",
+  
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:3939",
     trace: "on-first-retry",

@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { downloadVideo, checkCapabilities } from "./download.js";
 
 const WORKER_ID = process.env.WORKER_ID ?? `worker-${Math.random().toString(16).slice(2, 10)}`;
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -39,11 +40,489 @@ interface VideoInfo {
   duration: number;
 }
 
+// Download using curl (often works when fetch doesn't due to TLS/HTTP2 handling)
+async function downloadWithCurl(url: string, destPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    console.log(`[Worker] Trying curl for: ${url}`);
+    
+    const curl = spawn("curl", [
+      "-L",  // Follow redirects
+      "-f",  // Fail silently on HTTP errors
+      "-s",  // Silent mode
+      "-o", destPath,
+      "-A", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "-H", "Accept: video/mp4,video/*,*/*",
+      "-H", `Referer: ${url}`,
+      "--compressed",
+      "--max-time", "120",
+      url
+    ]);
+    
+    curl.stderr.on("data", (data) => console.log(`[curl] ${data.toString().trim()}`));
+    
+    curl.on("close", (code) => {
+      if (code === 0 && fs.existsSync(destPath)) {
+        const size = fs.statSync(destPath).size;
+        if (size > 10000) {
+          console.log(`[Worker] ✅ curl downloaded ${size} bytes`);
+          resolve(true);
+        } else {
+          console.log(`[Worker] curl file too small: ${size} bytes`);
+          fs.unlinkSync(destPath);
+          resolve(false);
+        }
+      } else {
+        console.log(`[Worker] curl failed with code ${code}`);
+        resolve(false);
+      }
+    });
+    
+    curl.on("error", (err) => {
+      console.log(`[Worker] curl not available: ${err.message}`);
+      resolve(false);
+    });
+  });
+}
+
+// Download using wget (alternative to curl)
+async function downloadWithWget(url: string, destPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    console.log(`[Worker] Trying wget for: ${url}`);
+    
+    const wget = spawn("wget", [
+      "-q",  // Quiet
+      "-O", destPath,
+      "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "--header=Accept: video/mp4,video/*,*/*",
+      `--header=Referer: ${url}`,
+      "--timeout=120",
+      "--tries=2",
+      url
+    ]);
+    
+    wget.stderr.on("data", (data) => console.log(`[wget] ${data.toString().trim()}`));
+    
+    wget.on("close", (code) => {
+      if (code === 0 && fs.existsSync(destPath)) {
+        const size = fs.statSync(destPath).size;
+        if (size > 10000) {
+          console.log(`[Worker] ✅ wget downloaded ${size} bytes`);
+          resolve(true);
+        } else {
+          console.log(`[Worker] wget file too small: ${size} bytes`);
+          fs.unlinkSync(destPath);
+          resolve(false);
+        }
+      } else {
+        console.log(`[Worker] wget failed with code ${code}`);
+        resolve(false);
+      }
+    });
+    
+    wget.on("error", (err) => {
+      console.log(`[Worker] wget not available: ${err.message}`);
+      resolve(false);
+    });
+  });
+}
+
+// Download using yt-dlp with impersonation (bypasses more protections)
+async function downloadWithYtDlpImpersonate(url: string, destPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    console.log(`[Worker] Trying yt-dlp with impersonation for: ${url}`);
+    
+    const ytdlp = spawn("yt-dlp", [
+      "--no-warnings",
+      "--no-playlist",
+      "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+      "--merge-output-format", "mp4",
+      "--output", destPath,
+      "--no-check-certificates",
+      "--extractor-args", "generic:impersonate",
+      "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      url
+    ]);
+    
+    ytdlp.stdout.on("data", (data) => console.log(`[yt-dlp-imp] ${data.toString().trim()}`));
+    ytdlp.stderr.on("data", (data) => console.log(`[yt-dlp-imp] ${data.toString().trim()}`));
+    
+    ytdlp.on("close", (code) => {
+      if (code === 0 && fs.existsSync(destPath)) {
+        const size = fs.statSync(destPath).size;
+        console.log(`[Worker] ✅ yt-dlp (impersonate) downloaded ${size} bytes`);
+        resolve(true);
+      } else {
+        console.log(`[Worker] yt-dlp (impersonate) failed with code ${code}`);
+        resolve(false);
+      }
+    });
+    
+    ytdlp.on("error", (err) => {
+      console.log(`[Worker] yt-dlp not available: ${err.message}`);
+      resolve(false);
+    });
+    
+    setTimeout(() => {
+      ytdlp.kill();
+      resolve(false);
+    }, 90000);
+  });
+}
+
+// Use Puppeteer to extract video URL from pages with Cloudflare protection
+async function downloadWithPuppeteer(url: string, destPath: string): Promise<boolean> {
+  console.log(`[Worker] Trying Puppeteer for: ${url}`);
+  
+  try {
+    const puppeteer = await import('puppeteer-core');
+    
+    // Try to find Chrome/Chromium
+    const possiblePaths = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      process.env.CHROME_PATH,
+    ].filter(Boolean);
+    
+    let executablePath: string | undefined;
+    for (const p of possiblePaths) {
+      if (p && fs.existsSync(p)) {
+        executablePath = p;
+        break;
+      }
+    }
+    
+    if (!executablePath) {
+      console.log(`[Worker] Chrome/Chromium not found, skipping Puppeteer`);
+      return false;
+    }
+    
+    console.log(`[Worker] Using browser: ${executablePath}`);
+    
+    const browser = await puppeteer.default.launch({
+      executablePath,
+      headless: 'shell', // Use new headless mode for better compatibility
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+      ],
+    });
+    
+    const page = await browser.newPage();
+    
+    // Anti-detection measures
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty((globalThis as any).navigator, 'webdriver', { get: () => false });
+    });
+    
+    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    
+    // Capture video URLs from network (including signed URLs)
+    const videoUrls: { url: string; size: number; contentType: string }[] = [];
+    page.on('response', (response) => {
+      const respUrl = response.url();
+      const contentType = response.headers()['content-type'] || '';
+      const contentLength = parseInt(response.headers()['content-length'] || '0');
+      
+      // Look for video content or video-related URLs
+      if (contentType.includes('video') || 
+          respUrl.includes('video') ||
+          respUrl.includes('.mp4') ||
+          respUrl.includes('/raw') ||
+          respUrl.includes('media')) {
+        console.log(`[Worker] Network video: ${respUrl.substring(0, 80)}... (${contentLength} bytes)`);
+        videoUrls.push({ url: respUrl, size: contentLength, contentType });
+      }
+    });
+    
+    // Navigate to the page
+    console.log(`[Worker] Navigating to: ${url}`);
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 45000 });
+    
+    // Wait for video element to load
+    console.log(`[Worker] Waiting for video to load...`);
+    await new Promise(r => setTimeout(r, 5000));
+    
+    // Try to click/play video to trigger loading
+    try {
+      await page.click('video');
+      await new Promise(r => setTimeout(r, 2000));
+    } catch {
+      // Video might auto-play
+    }
+    
+    // Get video element src (this is the key - it contains signed Azure URL)
+    const videoInfo = await page.evaluate((): { src: string | null; currentSrc: string | null; duration: number } => {
+      const doc = (globalThis as any).document;
+      const video = doc.querySelector('video');
+      if (video) {
+        return {
+          src: video.src || null,
+          currentSrc: video.currentSrc || null,
+          duration: video.duration || 0,
+        };
+      }
+      return { src: null, currentSrc: null, duration: 0 };
+    });
+    
+    await browser.close();
+    
+    // Prioritize video element src (contains signed URL that works)
+    const urlsToTry: string[] = [];
+    
+    if (videoInfo.src) {
+      console.log(`[Worker] Found video.src: ${videoInfo.src.substring(0, 80)}...`);
+      urlsToTry.push(videoInfo.src);
+    }
+    if (videoInfo.currentSrc && videoInfo.currentSrc !== videoInfo.src) {
+      urlsToTry.push(videoInfo.currentSrc);
+    }
+    
+    // Add network-captured video URLs, sorted by size (largest first)
+    const sortedNetworkUrls = videoUrls
+      .filter(v => v.contentType.includes('video') || v.size > 100000)
+      .sort((a, b) => b.size - a.size)
+      .map(v => v.url);
+    urlsToTry.push(...sortedNetworkUrls);
+    
+    console.log(`[Worker] Found ${urlsToTry.length} video URLs to try`);
+    
+    // Try to download each URL
+    for (const videoUrl of [...new Set(urlsToTry)]) {
+      console.log(`[Worker] Downloading: ${videoUrl.substring(0, 80)}...`);
+      try {
+        const resp = await fetch(videoUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Referer': url,
+            'Origin': new URL(url).origin,
+          },
+        });
+        
+        if (resp.ok) {
+          const buffer = await resp.arrayBuffer();
+          console.log(`[Worker] Downloaded ${buffer.byteLength} bytes`);
+          
+          // Verify it's a real video (check MP4 signature or size)
+          const header = new Uint8Array(buffer.slice(0, 12));
+          const isMp4 = header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70;
+          
+          if (isMp4 || buffer.byteLength > 500000) { // MP4 signature or > 500KB
+            fs.writeFileSync(destPath, Buffer.from(buffer));
+            console.log(`[Worker] ✅ Puppeteer download successful: ${buffer.byteLength} bytes`);
+            return true;
+          } else {
+            console.log(`[Worker] Not a valid video file, trying next URL...`);
+          }
+        }
+      } catch (e) {
+        console.log(`[Worker] Download failed: ${e}`);
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.log(`[Worker] Puppeteer error: ${error}`);
+    return false;
+  }
+}
+
+// Download video using yt-dlp (handles most video sites)
+async function downloadWithYtDlp(url: string, destPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    console.log(`[Worker] Trying yt-dlp for: ${url}`);
+    
+    const ytdlp = spawn("yt-dlp", [
+      "--no-warnings",
+      "--no-playlist",
+      "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+      "--merge-output-format", "mp4",
+      "--output", destPath,
+      "--no-check-certificates",
+      "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      url
+    ]);
+    
+    let stderr = "";
+    ytdlp.stdout.on("data", (data) => console.log(`[yt-dlp] ${data.toString().trim()}`));
+    ytdlp.stderr.on("data", (data) => { 
+      stderr += data.toString();
+      console.log(`[yt-dlp] ${data.toString().trim()}`);
+    });
+    
+    ytdlp.on("close", (code) => {
+      if (code === 0 && fs.existsSync(destPath)) {
+        const size = fs.statSync(destPath).size;
+        console.log(`[Worker] ✅ yt-dlp downloaded ${size} bytes`);
+        resolve(true);
+      } else {
+        console.log(`[Worker] yt-dlp failed with code ${code}`);
+        resolve(false);
+      }
+    });
+    
+    ytdlp.on("error", (err) => {
+      console.log(`[Worker] yt-dlp not available: ${err.message}`);
+      resolve(false);
+    });
+    
+    // Timeout after 60 seconds
+    setTimeout(() => {
+      ytdlp.kill();
+      resolve(false);
+    }, 60000);
+  });
+}
+
+// Simple direct download with browser headers
+async function downloadDirect(url: string, destPath: string): Promise<boolean> {
+  console.log(`[Worker] Trying direct download: ${url}`);
+  
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'video/mp4,video/*,application/octet-stream,*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': url,
+  };
+  
+  try {
+    const response = await fetch(url, { headers, redirect: 'follow' });
+    console.log(`[Worker] Response: ${response.status} ${response.statusText}`);
+    console.log(`[Worker] Content-Type: ${response.headers.get('content-type')}`);
+    
+    if (!response.ok) {
+      console.log(`[Worker] Direct download failed: ${response.status}`);
+      return false;
+    }
+    
+    const contentType = response.headers.get('content-type') || '';
+    
+    // If it's HTML, we need to extract the video URL
+    if (contentType.includes('text/html')) {
+      console.log(`[Worker] Got HTML, will try to extract video URL`);
+      return false;
+    }
+    
+    const buffer = await response.arrayBuffer();
+    
+    // Check if it's a valid video (at least 10KB and looks like video data)
+    if (buffer.byteLength < 10000) {
+      console.log(`[Worker] File too small: ${buffer.byteLength} bytes`);
+      return false;
+    }
+    
+    fs.writeFileSync(destPath, Buffer.from(buffer));
+    console.log(`[Worker] ✅ Direct download successful: ${buffer.byteLength} bytes`);
+    return true;
+  } catch (error) {
+    console.log(`[Worker] Direct download error: ${error}`);
+    return false;
+  }
+}
+
+// Extract video URL from HTML page and download
+async function downloadFromPage(url: string, destPath: string): Promise<boolean> {
+  console.log(`[Worker] Fetching page to extract video URL: ${url}`);
+  
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+  
+  try {
+    const response = await fetch(url, { headers, redirect: 'follow' });
+    if (!response.ok) {
+      console.log(`[Worker] Page fetch failed: ${response.status}`);
+      return false;
+    }
+    
+    const html = await response.text();
+    console.log(`[Worker] Page size: ${html.length} chars`);
+    
+    // Extract video URLs from HTML
+    const videoPatterns = [
+      // JSON data patterns
+      /"(?:video_?[Uu]rl|download_?[Uu]rl|mp4_?[Uu]rl|stream_?[Uu]rl|file_?[Uu]rl|src|url)"\s*:\s*"(https?:\/\/[^"]+\.(?:mp4|webm|mov)[^"]*)"/gi,
+      /"(?:video_?[Uu]rl|download_?[Uu]rl|mp4_?[Uu]rl|stream_?[Uu]rl|file_?[Uu]rl|src|url)"\s*:\s*"(https?:\/\/[^"]+)"/gi,
+      // HTML video tags  
+      /<video[^>]*\ssrc=["']([^"']+)["']/gi,
+      /<source[^>]*\ssrc=["']([^"']+)["'][^>]*type=["']video/gi,
+      // Data attributes
+      /data-(?:video-)?(?:src|url)=["']([^"']+\.(?:mp4|webm|mov)[^"']*)["']/gi,
+      // Direct URLs in content
+      /https?:\/\/[^\s"'<>]+\.mp4(?:\?[^\s"'<>]*)?/gi,
+      /https?:\/\/[^\s"'<>]*\/video[^\s"'<>]*\.mp4[^\s"'<>]*/gi,
+    ];
+    
+    const foundUrls: string[] = [];
+    
+    for (const pattern of videoPatterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        let videoUrl = (match[1] || match[0])
+          .replace(/\\u002F/g, '/')
+          .replace(/\\\//g, '/')
+          .replace(/\\"/g, '')
+          .replace(/&amp;/g, '&');
+        
+        if (videoUrl.startsWith('http') && !foundUrls.includes(videoUrl)) {
+          foundUrls.push(videoUrl);
+        }
+      }
+    }
+    
+    console.log(`[Worker] Found ${foundUrls.length} video URLs in page`);
+    foundUrls.slice(0, 5).forEach((u, i) => console.log(`[Worker]   ${i+1}. ${u.substring(0, 80)}...`));
+    
+    // Try to download each found URL
+    for (const videoUrl of foundUrls) {
+      const videoHeaders = {
+        ...headers,
+        'Accept': 'video/mp4,video/*,*/*',
+        'Referer': url,
+        'Origin': new URL(url).origin,
+      };
+      
+      try {
+        const videoResp = await fetch(videoUrl, { headers: videoHeaders, redirect: 'follow' });
+        if (videoResp.ok) {
+          const buffer = await videoResp.arrayBuffer();
+          if (buffer.byteLength > 10000) {
+            fs.writeFileSync(destPath, Buffer.from(buffer));
+            console.log(`[Worker] ✅ Downloaded from extracted URL: ${buffer.byteLength} bytes`);
+            return true;
+          }
+        }
+      } catch (e) {
+        console.log(`[Worker] Failed to download ${videoUrl.substring(0, 50)}: ${e}`);
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.log(`[Worker] Page extraction error: ${error}`);
+    return false;
+  }
+}
+
 async function downloadFile(url: string, destPath: string): Promise<void> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to download: ${response.statusText}`);
-  const buffer = await response.arrayBuffer();
-  fs.writeFileSync(destPath, Buffer.from(buffer));
+  // Use the scalable download module (works on local, Vercel, Railway)
+  const result = await downloadVideo(url, destPath);
+  
+  if (!result.success) {
+    console.error(`[Worker] ❌ Download failed: ${result.error}`);
+    throw new Error(
+      `Failed to download video: ${result.error}. Tips: 1) Right-click the video → "Copy video address" and paste that URL, ` +
+      `2) Download the video to your device and upload it directly, ` +
+      `3) Try a different video hosting platform.`
+    );
+  }
+  
+  console.log(`[Worker] ✅ Downloaded ${result.size} bytes via ${result.method}`);
 }
 
 async function getVideoInfo(filePath: string): Promise<VideoInfo> {
@@ -339,6 +818,11 @@ async function processJob(job: Job<JobData>): Promise<void> {
 async function main(): Promise<void> {
   console.log(`[Worker] Starting BlankLogo worker ${WORKER_ID}`);
   console.log(`[Worker] Concurrency: ${CONCURRENCY}`);
+  
+  // Log download capabilities
+  const caps = await checkCapabilities();
+  console.log(`[Worker] Environment: ${caps.environment}`);
+  console.log(`[Worker] Capabilities: Chrome=${caps.chrome}, Chromium=${caps.chromium}, Browserless=${caps.browserless}, yt-dlp=${caps.ytdlp}, curl=${caps.curl}`);
 
   const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 

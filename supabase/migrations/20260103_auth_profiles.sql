@@ -97,6 +97,20 @@ CREATE TABLE IF NOT EXISTS bl_deletion_requests (
   notes TEXT
 );
 
+-- Add missing columns if table already exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bl_profiles' AND column_name = 'deletion_scheduled_at') THEN
+    ALTER TABLE bl_profiles ADD COLUMN deletion_scheduled_at TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bl_profiles' AND column_name = 'deletion_requested_at') THEN
+    ALTER TABLE bl_profiles ADD COLUMN deletion_requested_at TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bl_profiles' AND column_name = 'deleted_at') THEN
+    ALTER TABLE bl_profiles ADD COLUMN deleted_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_bl_profiles_subscription ON bl_profiles(subscription_tier);
 CREATE INDEX IF NOT EXISTS idx_bl_profiles_deletion ON bl_profiles(deletion_scheduled_at) WHERE deletion_scheduled_at IS NOT NULL;
