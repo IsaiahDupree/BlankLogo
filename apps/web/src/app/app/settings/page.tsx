@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Bell, Mail, Loader2, CheckCircle } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Bell, Mail, Loader2, CheckCircle, Cloud } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 
@@ -33,6 +33,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoad = useRef(true);
 
   const toast = useToast();
 
@@ -85,10 +88,12 @@ export default function SettingsPage() {
     fetchPrefs();
   }, [fetchPrefs]);
 
-  async function handleSave() {
+  async function handleSave(isAutoSave = false) {
     logSettings("💾 Saving preferences...", prefs);
-    setSaving(true);
-    setSaved(false);
+    if (!isAutoSave) {
+      setSaving(true);
+      setSaved(false);
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -126,16 +131,59 @@ export default function SettingsPage() {
         logSettings("⚠️ Cache invalidation failed (non-critical):", cacheErr);
       }
       
-      setSaved(true);
-      toast.success("Preferences saved successfully!");
-      setTimeout(() => setSaved(false), 2000);
+      if (isAutoSave) {
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      } else {
+        setSaved(true);
+        toast.success("Preferences saved successfully!");
+        setTimeout(() => setSaved(false), 2000);
+      }
     } catch (err) {
       logSettings("❌ Failed to save preferences:", err);
-      toast.error("Failed to save preferences. Please try again.");
+      if (!isAutoSave) {
+        toast.error("Failed to save preferences. Please try again.");
+      }
+      setAutoSaveStatus('idle');
     } finally {
       setSaving(false);
     }
   }
+
+  // Auto-save when prefs change (with debounce)
+  useEffect(() => {
+    // Skip auto-save on initial load
+    if (isInitialLoad.current) {
+      return;
+    }
+
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce save by 500ms
+    setAutoSaveStatus('saving');
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSave(true); // true = auto-save (silent)
+    }, 500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [prefs]);
+
+  // Mark initial load complete after prefs are fetched
+  useEffect(() => {
+    if (!loading) {
+      // Small delay to ensure state is settled
+      setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 100);
+    }
+  }, [loading]);
 
   function togglePref(key: keyof NotificationPrefs) {
     logSettings("🔄 Toggling preference:", key);
@@ -213,26 +261,25 @@ export default function SettingsPage() {
         />
       </div>
 
-      {/* Save Button */}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full py-3 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 transition font-semibold flex items-center justify-center gap-2"
-      >
-        {saving ? (
+      {/* Auto-save Status */}
+      <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-400">
+        {autoSaveStatus === 'saving' ? (
           <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Saving...
+            <Cloud className="w-4 h-4 animate-pulse" />
+            <span>Saving...</span>
           </>
-        ) : saved ? (
+        ) : autoSaveStatus === 'saved' ? (
           <>
-            <CheckCircle className="w-5 h-5" />
-            Saved!
+            <CheckCircle className="w-4 h-4 text-green-500" />
+            <span className="text-green-500">All changes saved</span>
           </>
         ) : (
-          "Save Preferences"
+          <>
+            <Cloud className="w-4 h-4" />
+            <span>Changes save automatically</span>
+          </>
         )}
-      </button>
+      </div>
     </div>
   );
 }
