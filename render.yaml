@@ -1,0 +1,84 @@
+# BlankLogo Render Blueprint
+# Deploy with: render blueprint apply
+
+services:
+  # Redis Database
+  - type: redis
+    name: blanklogo-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # API Server
+  - type: web
+    name: blanklogo-api
+    runtime: node
+    plan: free
+    rootDir: apps/api
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8989
+      - key: REDIS_URL
+        fromService:
+          name: blanklogo-redis
+          type: redis
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
+
+  # Background Worker
+  - type: worker
+    name: blanklogo-worker
+    runtime: node
+    plan: free
+    rootDir: apps/worker
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WORKER_ID
+        value: worker-1
+      - key: WORKER_CONCURRENCY
+        value: "2"
+      - key: REDIS_URL
+        fromService:
+          name: blanklogo-redis
+          type: redis
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+
+  # Web App (Next.js)
+  - type: web
+    name: blanklogo-web
+    runtime: node
+    plan: free
+    rootDir: apps/web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3939
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: blanklogo-api
+          type: web
+          property: host
