@@ -93,6 +93,11 @@ export default function SignupPage() {
             We sent a confirmation link to <strong className="text-white">{email}</strong>.
             Click the link to activate your account.
           </p>
+          <p className="text-gray-500 text-sm mb-6">
+            The link is valid for 24 hours. Check your spam folder if you don&apos;t see it.
+            <br />
+            <span className="text-gray-600">Note: You can only request a new link once per minute.</span>
+          </p>
           <Link
             href="/login"
             className="inline-block px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-semibold"

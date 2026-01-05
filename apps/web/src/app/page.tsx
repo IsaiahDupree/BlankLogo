@@ -46,7 +46,7 @@ export default function Home() {
             Platforms
           </Link>
           <Link
-            href="/login"
+            href="/signup"
             className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
           >
             Get Started
