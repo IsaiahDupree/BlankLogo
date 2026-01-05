@@ -18,6 +18,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Facebook Domain Verification */}
+        <meta name="facebook-domain-verification" content="nk3uy34a0jkikq80nohcxwistxne25" />
+      </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>
