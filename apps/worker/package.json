@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@blanklogo/shared": "workspace:*",
+    "@browserbasehq/sdk": "^2.6.0",
     "@sparticuz/chromium": "^143.0.4",
     "@supabase/supabase-js": "^2.45.0",
     "archiver": "^7.0.0",

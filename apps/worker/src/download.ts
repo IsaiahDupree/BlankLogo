@@ -18,6 +18,10 @@ const IS_CLOUD = IS_VERCEL || IS_RAILWAY || IS_AWS_LAMBDA || !!process.env.CLOUD
 const BROWSERLESS_URL = process.env.BROWSERLESS_URL; // e.g., wss://chrome.browserless.io?token=YOUR_TOKEN
 const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN;
 
+// Browserbase credentials (alternative cloud browser)
+const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY || process.env.BROWSERLESS_TOKEN; // Support both names
+const BROWSERBASE_PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID || process.env.BROWSERLESS_PROJECT_ID;
+
 interface DownloadResult {
   success: boolean;
   filePath?: string;
@@ -158,19 +162,30 @@ async function downloadWithLocalPuppeteer(url: string, destPath: string): Promis
 }
 
 /**
- * Download video using Browserless.io (cloud browser service)
+ * Download video using cloud browser service (Browserbase or Browserless.io)
  */
-async function downloadWithBrowserless(url: string, destPath: string): Promise<DownloadResult> {
-  if (!BROWSERLESS_URL && !BROWSERLESS_TOKEN) {
-    return { success: false, error: 'Browserless not configured' };
+async function downloadWithCloudBrowser(url: string, destPath: string): Promise<DownloadResult> {
+  // Check for Browserbase first (bb_live_ prefix), then Browserless
+  const isBrowserbase = BROWSERBASE_API_KEY?.startsWith('bb_') && BROWSERBASE_PROJECT_ID;
+  const hasBrowserless = BROWSERLESS_URL || (BROWSERLESS_TOKEN && !BROWSERLESS_TOKEN.startsWith('bb_'));
+  
+  if (!isBrowserbase && !hasBrowserless) {
+    return { success: false, error: 'Cloud browser not configured' };
   }
   
-  console.log('[Download] Trying Browserless.io...');
+  const serviceName = isBrowserbase ? 'Browserbase' : 'Browserless.io';
+  console.log(`[Download] Trying ${serviceName}...`);
   
   try {
     const puppeteer = await import('puppeteer-core');
     
-    const wsEndpoint = BROWSERLESS_URL || `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`;
+    // Build WebSocket endpoint based on service
+    let wsEndpoint: string;
+    if (isBrowserbase) {
+      wsEndpoint = `wss://connect.browserbase.com?apiKey=${BROWSERBASE_API_KEY}&projectId=${BROWSERBASE_PROJECT_ID}`;
+    } else {
+      wsEndpoint = BROWSERLESS_URL || `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`;
+    }
     
     const browser = await puppeteer.default.connect({
       browserWSEndpoint: wsEndpoint,
@@ -207,15 +222,15 @@ async function downloadWithBrowserless(url: string, destPath: string): Promise<D
           const buffer = await resp.arrayBuffer();
           if (buffer.byteLength > 100000) {
             fs.writeFileSync(destPath, Buffer.from(buffer));
-            return { success: true, filePath: destPath, size: buffer.byteLength, method: 'browserless' };
+            return { success: true, filePath: destPath, size: buffer.byteLength, method: isBrowserbase ? 'browserbase' : 'browserless' };
           }
         }
       } catch (e) {
-        console.log('[Download] Browserless fetch failed:', videoUrl.substring(0, 80), e instanceof Error ? e.message : e);
+        console.log(`[Download] ${serviceName} fetch failed:`, videoUrl.substring(0, 80), e instanceof Error ? e.message : e);
       }
     }
     
-    return { success: false, error: 'No valid video URL found via Browserless' };
+    return { success: false, error: `No valid video URL found via ${serviceName}` };
   } catch (error) {
     return { success: false, error: String(error) };
   }
@@ -350,9 +365,12 @@ export async function downloadVideo(url: string, destPath: string): Promise<Down
   // For page URLs or if direct methods failed, try browser-based extraction
   console.log('[Download] Trying browser-based extraction...');
   
-  // Method 1: Browserless (best for cloud - no local Chrome needed)
-  if (BROWSERLESS_URL || BROWSERLESS_TOKEN) {
-    const result = await downloadWithBrowserless(url, destPath);
+  // Method 1: Cloud browser (Browserbase or Browserless - no local Chrome needed)
+  const hasCloudBrowser = (BROWSERBASE_API_KEY?.startsWith('bb_') && BROWSERBASE_PROJECT_ID) || 
+                          BROWSERLESS_URL || 
+                          (BROWSERLESS_TOKEN && !BROWSERLESS_TOKEN.startsWith('bb_'));
+  if (hasCloudBrowser) {
+    const result = await downloadWithCloudBrowser(url, destPath);
     if (result.success) return result;
   }
   
@@ -422,10 +440,14 @@ export async function checkCapabilities(): Promise<{
     // curl not installed - this is expected in some environments
   }
   
+  // Check for cloud browser (Browserbase or Browserless)
+  const hasBrowserbase = BROWSERBASE_API_KEY?.startsWith('bb_') && !!BROWSERBASE_PROJECT_ID;
+  const hasBrowserless = !!(BROWSERLESS_URL || (BROWSERLESS_TOKEN && !BROWSERLESS_TOKEN.startsWith('bb_')));
+  
   return {
     chrome: !!chromePath && !IS_CLOUD,
     chromium: IS_CLOUD && !!chromePath,
-    browserless: !!(BROWSERLESS_URL || BROWSERLESS_TOKEN),
+    browserless: hasBrowserbase || hasBrowserless, // True if any cloud browser configured
     ytdlp: ytdlpAvailable,
     curl: curlAvailable,
     environment: IS_VERCEL ? 'vercel' : IS_RAILWAY ? 'railway' : IS_AWS_LAMBDA ? 'lambda' : 'local',

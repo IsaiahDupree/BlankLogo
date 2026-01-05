@@ -1,6 +1,16 @@
 # BlankLogo - AI Video Watermark Remover
 
-Remove watermarks from AI-generated videos instantly. Supports Sora, TikTok, Runway, Pika, Kling, Luma, and more.
+Remove watermarks from AI-generated videos instantly. **Upload your video and get a clean, watermark-free version in seconds.**
+
+## 🎬 How It Works
+
+1. **Upload** - Drag & drop your video (up to 500MB)
+2. **Select Platform** - Choose Sora, TikTok, Runway, Pika, or custom crop
+3. **Download** - Get your watermark-free video
+
+> **Best Results**: Download your AI-generated video to your device, then upload it directly to BlankLogo. This ensures the highest quality output.
+
+Supports Sora, TikTok, Runway, Pika, Kling, Luma, Instagram, Facebook, and more.
 
 ## Architecture
 
@@ -38,14 +48,17 @@ Remove watermarks from AI-generated videos instantly. Supports Sora, TikTok, Run
 
 ## Supported Platforms
 
-| Platform | Default Crop | Position |
-|----------|-------------|----------|
-| Sora | 100px | bottom |
-| TikTok | 80px | bottom |
-| Runway | 60px | bottom |
-| Pika | 50px | bottom |
-| Kling | 70px | bottom |
-| Luma | 55px | bottom |
+| Platform | Default Crop | Position | Notes |
+|----------|-------------|----------|-------|
+| Sora | 100px | bottom | OpenAI video model |
+| TikTok | 80px | bottom | TikTok watermarks |
+| Runway | 60px | bottom | Gen-2/Gen-3 |
+| Pika | 50px | bottom | Pika Labs |
+| Kling | 70px | bottom | Kling AI |
+| Luma | 55px | bottom | Dream Machine |
+| Instagram | auto | varies | Reels watermarks |
+| Facebook | auto | varies | Meta video watermarks |
+| Custom | adjustable | any | Set your own crop |
 
 ## Getting Started
 
@@ -111,10 +124,23 @@ WORKER_CONCURRENCY=2
 
 ## API Endpoints
 
-### Create Job
+### Upload Video (Recommended)
+```bash
+POST /api/v1/jobs/upload
+Content-Type: multipart/form-data
+Authorization: Bearer <token>
+
+# Form fields:
+# - video: <file> (up to 500MB)
+# - platform: "sora" | "tiktok" | "runway" | "pika" | "kling" | "luma" | "custom"
+# - crop_pixels: 100 (optional, uses platform default)
+```
+
+### Create Job from URL
 ```bash
 POST /api/v1/jobs
 Content-Type: application/json
+Authorization: Bearer <token>
 
 {
   "video_url": "https://example.com/video.mp4",
@@ -124,23 +150,17 @@ Content-Type: application/json
 }
 ```
 
+> **Note**: URL-based jobs may fail for some platforms due to download restrictions. For best results, use the upload endpoint.
+
 ### Get Job Status
 ```bash
 GET /api/v1/jobs/{job_id}
 ```
 
-### Batch Processing
+### Diagnostics (Health Check)
 ```bash
-POST /api/v1/jobs/batch
-Content-Type: application/json
-
-{
-  "videos": [
-    {"video_url": "https://example.com/video1.mp4"},
-    {"video_url": "https://example.com/video2.mp4"}
-  ],
-  "platform": "sora"
-}
+GET /diagnostics  # Returns detailed service health status
+GET /health       # Simple health check
 ```
 
 ## Railway Deployment
