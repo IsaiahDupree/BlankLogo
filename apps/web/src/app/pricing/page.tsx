@@ -6,6 +6,17 @@ import Link from "next/link";
 import { Check, Zap, Crown, Rocket, CreditCard, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
+// Stripe Price IDs (must match apps/web/src/lib/stripe.ts)
+const PRICE_IDS = {
+  pack_10: "price_1Sm34mD7MP3Gp2rw8A8eImNp",
+  pack_25: "price_1Sm37mD7MP3Gp2rwdNEBy48s",
+  pack_50: "price_1Sm39BD7MP3Gp2rwpb5yacXu",
+  pack_100: "price_1Sm3BSD7MP3Gp2rwpAUsvejC",
+  starter: "price_1Sm35mD7MP3Gp2rwGHDyW88r",
+  pro: "price_1Sm39fD7MP3Gp2rwyght0raR",
+  business: "price_1Sm3ArD7MP3Gp2rwltwUFlfz",
+} as const;
+
 // Monthly subscription plans
 const MONTHLY_PLANS = [
   {
@@ -104,11 +115,18 @@ export default function PricingPage() {
     setPurchasing(planId);
 
     try {
+      const priceId = PRICE_IDS[planId as keyof typeof PRICE_IDS];
+      if (!priceId) {
+        console.error("[PRICING] Invalid plan ID:", planId);
+        alert("Invalid plan selected");
+        return;
+      }
+
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          priceId: `price_${planId}`,
+          priceId,
           mode: isSubscription ? "subscription" : "payment",
         }),
       });

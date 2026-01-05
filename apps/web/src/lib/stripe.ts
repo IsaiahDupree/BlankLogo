@@ -24,17 +24,17 @@ export const stripe = new Proxy({} as Stripe, {
   }
 });
 
-// Credit pack Stripe Price IDs (create these in Stripe Dashboard)
+// Credit pack Stripe Price IDs (from Stripe Dashboard)
 export const STRIPE_PRICE_IDS = {
   // One-time credit packs
-  pack_10: process.env.STRIPE_PRICE_PACK_10 ?? "price_pack_10",
-  pack_25: process.env.STRIPE_PRICE_PACK_25 ?? "price_pack_25",
-  pack_50: process.env.STRIPE_PRICE_PACK_50 ?? "price_pack_50",
-  pack_100: process.env.STRIPE_PRICE_PACK_100 ?? "price_pack_100",
+  pack_10: process.env.STRIPE_PRICE_PACK_10 ?? "price_1Sm34mD7MP3Gp2rw8A8eImNp",
+  pack_25: process.env.STRIPE_PRICE_PACK_25 ?? "price_1Sm37mD7MP3Gp2rwdNEBy48s",
+  pack_50: process.env.STRIPE_PRICE_PACK_50 ?? "price_1Sm39BD7MP3Gp2rwpb5yacXu",
+  pack_100: process.env.STRIPE_PRICE_PACK_100 ?? "price_1Sm3BSD7MP3Gp2rwpAUsvejC",
   // Monthly subscription tiers
-  starter: process.env.STRIPE_PRICE_STARTER ?? "price_starter",
-  pro: process.env.STRIPE_PRICE_PRO ?? "price_pro",
-  business: process.env.STRIPE_PRICE_BUSINESS ?? "price_business",
+  starter: process.env.STRIPE_PRICE_STARTER ?? "price_1Sm35mD7MP3Gp2rwGHDyW88r",
+  pro: process.env.STRIPE_PRICE_PRO ?? "price_1Sm39fD7MP3Gp2rwyght0raR",
+  business: process.env.STRIPE_PRICE_BUSINESS ?? "price_1Sm3ArD7MP3Gp2rwltwUFlfz",
 } as const;
 
 // Map credits to pack IDs (one-time purchases)

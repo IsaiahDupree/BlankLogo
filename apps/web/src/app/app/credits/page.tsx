@@ -13,6 +13,7 @@ import {
 } from "@/lib/meta-pixel";
 import * as ga from "@/lib/google-analytics";
 import * as ph from "@/lib/posthog";
+import { STRIPE_PRICE_IDS } from "@/lib/stripe";
 
 // Logging utility
 function logCredits(message: string, data?: unknown) {
@@ -146,11 +147,18 @@ export default function CreditsPage() {
 
     try {
       logCredits("⏳ Creating checkout session...");
+      const priceId = STRIPE_PRICE_IDS[packId as keyof typeof STRIPE_PRICE_IDS];
+      if (!priceId) {
+        logCredits("❌ Invalid pack ID:", packId);
+        toast.error("Invalid plan selected");
+        return;
+      }
+
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          priceId: `price_${packId}`,
+          priceId,
           mode: isSubscription ? "subscription" : "payment",
         }),
       });

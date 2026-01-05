@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   // Determine mode based on whether it's a subscription or one-time
-  const isSubscription = ["starter", "pro", "creator_plus"].some(
+  const isSubscription = ["starter", "pro", "business"].some(
     (tier) => STRIPE_PRICE_IDS[tier as keyof typeof STRIPE_PRICE_IDS] === priceId
   );
 
