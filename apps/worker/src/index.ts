@@ -994,10 +994,21 @@ async function removeWatermark(
   videoInfo: VideoInfo,
   processingMode: ProcessingMode = "inpaint"
 ): Promise<{ mode: string; watermarksDetected?: number }> {
-  // Always use AI inpainting for all sources - no cropping
-  // This preserves full frame and uses YOLO detection + LAMA/OpenCV inpainting
-  console.log(`[Worker] 🤖 Using AI inpainting (preserves full frame)`);
-  return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
+  // Try inpainting first if service is configured, fallback to crop
+  const inpaintUrl = process.env.INPAINT_SERVICE_URL;
+  
+  if (inpaintUrl && !inpaintUrl.includes('localhost')) {
+    console.log(`[Worker] 🤖 Using AI inpainting (${inpaintUrl})`);
+    try {
+      return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
+    } catch (err) {
+      console.log(`[Worker] ⚠️ Inpainting failed, falling back to crop: ${err}`);
+    }
+  }
+  
+  // Fallback to simple crop mode (FFmpeg only, no external service)
+  console.log(`[Worker] ✂️ Using FFmpeg crop mode (${cropPixels}px from ${cropPosition})`);
+  return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
 }
 
 async function uploadToStorage(filePath: string, jobId: string, filename: string): Promise<string> {
