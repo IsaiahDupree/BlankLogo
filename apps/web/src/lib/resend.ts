@@ -21,5 +21,5 @@ export const resend = {
   }
 };
 
-export const FROM = process.env.RESEND_FROM || "BlankLogo <hello@blanklogo.com>";
+export const FROM = process.env.RESEND_FROM || "BlankLogo <onboarding@resend.dev>";
 export const BASE_URL = process.env.APP_BASE_URL || "http://localhost:3939";
