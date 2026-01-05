@@ -32,14 +32,13 @@ services:
         value: "*"
 
   # Background Worker
-  - type: web
+  - type: worker
     name: blanklogo-worker
     runtime: node
     plan: free
     region: oregon
     buildCommand: "npm install -g pnpm && NODE_ENV=development pnpm install && pnpm --filter @blanklogo/worker build"
     startCommand: "NODE_ENV=production node apps/worker/dist/index.js"
-    healthCheckPath: /health
     envVars:
       - key: WORKER_ID
         value: worker-1
