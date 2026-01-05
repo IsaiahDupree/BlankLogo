@@ -26,26 +26,28 @@ export const stripe = new Proxy({} as Stripe, {
 
 // Credit pack Stripe Price IDs (create these in Stripe Dashboard)
 export const STRIPE_PRICE_IDS = {
+  // One-time credit packs
+  pack_10: process.env.STRIPE_PRICE_PACK_10 ?? "price_pack_10",
   pack_25: process.env.STRIPE_PRICE_PACK_25 ?? "price_pack_25",
-  pack_80: process.env.STRIPE_PRICE_PACK_80 ?? "price_pack_80",
-  pack_250: process.env.STRIPE_PRICE_PACK_250 ?? "price_pack_250",
-  pack_500: process.env.STRIPE_PRICE_PACK_500 ?? "price_pack_500",
-  // Subscription tiers
+  pack_50: process.env.STRIPE_PRICE_PACK_50 ?? "price_pack_50",
+  pack_100: process.env.STRIPE_PRICE_PACK_100 ?? "price_pack_100",
+  // Monthly subscription tiers
   starter: process.env.STRIPE_PRICE_STARTER ?? "price_starter",
   pro: process.env.STRIPE_PRICE_PRO ?? "price_pro",
-  creator_plus: process.env.STRIPE_PRICE_CREATOR_PLUS ?? "price_creator_plus",
+  business: process.env.STRIPE_PRICE_BUSINESS ?? "price_business",
 } as const;
 
-// Map credits to pack IDs
+// Map credits to pack IDs (one-time purchases)
 export const CREDITS_BY_PACK = {
+  pack_10: 10,
   pack_25: 25,
-  pack_80: 80,
-  pack_250: 250,
-  pack_500: 500,
+  pack_50: 50,
+  pack_100: 100,
 } as const;
 
+// Map credits to subscription tiers (monthly)
 export const CREDITS_BY_SUBSCRIPTION = {
-  starter: 60,
-  pro: 200,
-  creator_plus: 500,
+  starter: 10,
+  pro: 50,
+  business: 200,
 } as const;
