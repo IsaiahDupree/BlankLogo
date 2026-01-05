@@ -25,16 +25,17 @@ export const stripe = new Proxy({} as Stripe, {
 });
 
 // Credit pack Stripe Price IDs (from Stripe Dashboard)
+// These are the LIVE price IDs for BlankLogo
 export const STRIPE_PRICE_IDS = {
-  // One-time credit packs
-  pack_10: process.env.STRIPE_PRICE_PACK_10 ?? "price_1Sm34mD7MP3Gp2rw8A8eImNp",
-  pack_25: process.env.STRIPE_PRICE_PACK_25 ?? "price_1Sm37mD7MP3Gp2rwdNEBy48s",
-  pack_50: process.env.STRIPE_PRICE_PACK_50 ?? "price_1Sm39BD7MP3Gp2rwpb5yacXu",
-  pack_100: process.env.STRIPE_PRICE_PACK_100 ?? "price_1Sm3BSD7MP3Gp2rwpAUsvejC",
-  // Monthly subscription tiers
-  starter: process.env.STRIPE_PRICE_STARTER ?? "price_1Sm35mD7MP3Gp2rwGHDyW88r",
-  pro: process.env.STRIPE_PRICE_PRO ?? "price_1Sm39fD7MP3Gp2rwyght0raR",
-  business: process.env.STRIPE_PRICE_BUSINESS ?? "price_1Sm3ArD7MP3Gp2rwltwUFlfz",
+  // One-time credit packs (BlankLogo)
+  pack_10: process.env.STRIPE_PRICE_PACK_10 ?? "price_1SmNRBBF0wJEbOgNUQ4XB2DH",   // $9 - 10 credits
+  pack_25: process.env.STRIPE_PRICE_PACK_25 ?? "price_1SmNRJBF0wJEbOgNJMtcHI66",   // $19 - 25 credits
+  pack_50: process.env.STRIPE_PRICE_PACK_50 ?? "price_1SmNRKBF0wJEbOgNXPoLYo55",   // $35 - 50 credits
+  pack_100: process.env.STRIPE_PRICE_PACK_100 ?? "price_1SmNRKBF0wJEbOgNh7aVkcdg", // $59 - 100 credits
+  // Monthly subscription tiers (need to create recurring prices in Stripe Dashboard)
+  starter: process.env.STRIPE_PRICE_STARTER ?? "price_starter_placeholder",   // $9/mo - 10 credits
+  pro: process.env.STRIPE_PRICE_PRO ?? "price_pro_placeholder",               // $29/mo - 50 credits
+  business: process.env.STRIPE_PRICE_BUSINESS ?? "price_business_placeholder", // $79/mo - 200 credits
 } as const;
 
 // Map credits to pack IDs (one-time purchases)
