@@ -3,25 +3,35 @@ import { createClient } from "@/lib/supabase/server";
 import { stripe, STRIPE_PRICE_IDS } from "@/lib/stripe";
 
 export async function POST(request: Request) {
+  console.log("[STRIPE CHECKOUT] 🚀 Checkout request received");
+  
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  console.log("[STRIPE CHECKOUT] 👤 User:", user?.id || "NOT AUTHENTICATED");
+
   if (!user) {
+    console.log("[STRIPE CHECKOUT] ❌ Unauthorized - no user");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { priceId, mode } = await request.json();
+  console.log("[STRIPE CHECKOUT] 📦 Request:", { priceId, mode });
 
   if (!priceId) {
+    console.log("[STRIPE CHECKOUT] ❌ Missing priceId");
     return NextResponse.json({ error: "Price ID required" }, { status: 400 });
   }
 
   // Validate the price ID
   const validPriceIds = Object.values(STRIPE_PRICE_IDS);
+  console.log("[STRIPE CHECKOUT] ✅ Valid price IDs:", validPriceIds);
+  
   if (!validPriceIds.includes(priceId)) {
+    console.log("[STRIPE CHECKOUT] ❌ Invalid priceId:", priceId);
     return NextResponse.json({ error: "Invalid price ID" }, { status: 400 });
   }
 
@@ -63,6 +73,14 @@ export async function POST(request: Request) {
     }
 
     // Create checkout session
+    console.log("[STRIPE CHECKOUT] 🔧 Creating session with:", {
+      customerId,
+      checkoutMode,
+      priceId,
+      successUrl: `${process.env.APP_BASE_URL}/app/credits?success=true`,
+      cancelUrl: `${process.env.APP_BASE_URL}/app/credits?canceled=true`,
+    });
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: checkoutMode,
@@ -87,11 +105,12 @@ export async function POST(request: Request) {
       }),
     });
 
+    console.log("[STRIPE CHECKOUT] ✅ Session created:", session.id, "URL:", session.url);
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    console.error("Stripe checkout error:", error);
+    console.error("[STRIPE CHECKOUT] ❌ Error:", error);
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      { error: "Failed to create checkout session", details: String(error) },
       { status: 500 }
     );
   }

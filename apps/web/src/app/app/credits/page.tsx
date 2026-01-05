@@ -148,32 +148,38 @@ export default function CreditsPage() {
     try {
       logCredits("⏳ Creating checkout session...");
       const priceId = STRIPE_PRICE_IDS[packId as keyof typeof STRIPE_PRICE_IDS];
+      logCredits("🔑 Price ID for pack:", { packId, priceId });
+      
       if (!priceId) {
         logCredits("❌ Invalid pack ID:", packId);
         toast.error("Invalid plan selected");
         return;
       }
 
+      logCredits("📤 Sending checkout request...");
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           priceId,
           mode: isSubscription ? "subscription" : "payment",
         }),
       });
 
+      logCredits("📥 Response status:", res.status);
       const data = await res.json();
-      logCredits("📦 Checkout response:", { status: res.status, hasUrl: !!data.url });
+      logCredits("📦 Full response:", JSON.stringify(data));
 
       if (data.url) {
-        logCredits("🔗 Redirecting to Stripe checkout...");
+        logCredits("🔗 Redirecting to Stripe checkout:", data.url);
         window.location.href = data.url;
       } else {
-        logCredits("❌ No checkout URL returned");
+        logCredits("❌ No checkout URL returned. Error:", { error: data.error, details: data.details });
+        toast.error(data.error || "Failed to start checkout");
       }
     } catch (err) {
-      logCredits("❌ Checkout failed:", err);
+      logCredits("❌ Checkout fetch failed:", err);
       toast.error("Failed to start checkout. Please try again.");
     } finally {
       setPurchasing(null);
