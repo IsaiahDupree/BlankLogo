@@ -1095,18 +1095,20 @@ async function processJob(job: Job<JobData>): Promise<void> {
 
     // Upload original video for before/after comparison
     console.log(`[Worker] 📤 Uploading original video for comparison...`);
-    const originalFilename = `original_${inputFilename}.mp4`;
+    // Avoid double extension - remove .mp4 if already present before adding it
+    const baseFilename = inputFilename.replace(/\.mp4$/i, '');
+    const originalFilename = `original_${baseFilename}.mp4`;
     const originalUrl = await uploadToStorage(inputPath, jobId, originalFilename);
     console.log(`[Worker] ✅ Original video uploaded: ${originalUrl}`);
 
-    // Update input info in database with playable URL
+    // Update input info in database (keep original input_url for the uploaded file)
     console.log(`[Worker] 📊 Updating video metadata in database...`);
     await supabase
       .from("bl_jobs")
       .update({
         input_size_bytes: inputSize,
         input_duration_sec: videoInfo.duration,
-        input_url: originalUrl,  // Update to playable URL instead of page URL
+        // Don't overwrite input_url - it should stay pointing to the uploaded file
       })
       .eq("id", jobId);
 
