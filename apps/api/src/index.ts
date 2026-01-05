@@ -1176,7 +1176,7 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
     // Upload to R2/Supabase storage
     const storagePath = `uploads/${jobId}/${filename}`;
     const { error: uploadError } = await supabase.storage
-      .from('videos')
+      .from('bl_videos')
       .upload(storagePath, req.file.buffer, {
         contentType: req.file.mimetype,
       });
@@ -1186,7 +1186,7 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
     }
 
     const { data: urlData } = supabase.storage
-      .from('videos')
+      .from('bl_videos')
       .getPublicUrl(storagePath);
 
     const jobData: JobData = {
