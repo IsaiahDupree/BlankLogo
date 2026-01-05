@@ -87,20 +87,25 @@ export async function sendEmail({ to, template }: SendEmailOptions): Promise<boo
     return true;
   }
 
-  // Production: Use email provider
+  // Production: Use Resend email provider
   try {
-    // Example with Resend (uncomment when API key is set)
-    // const resend = new Resend(process.env.RESEND_API_KEY);
-    // await resend.emails.send({
-    //   from: "BlankLogo <noreply@blanklogo.com>",
-    //   to,
-    //   subject: template.subject,
-    //   html: template.html,
-    //   text: template.text,
-    // });
+    const { getResend, FROM } = await import("../resend");
+    const resend = getResend();
+    
+    const result = await resend.emails.send({
+      from: FROM,
+      to,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
 
-    // For now, just log in production too
-    console.log(`[EMAIL] Sent "${template.subject}" to ${to}`);
+    if (result.error) {
+      console.error(`[EMAIL] Resend error:`, result.error);
+      return false;
+    }
+
+    console.log(`[EMAIL] ✅ Sent "${template.subject}" to ${to} (id: ${result.data?.id})`);
     return true;
   } catch (error) {
     console.error("[EMAIL] Failed to send:", error);
