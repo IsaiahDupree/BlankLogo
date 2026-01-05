@@ -1,237 +1,386 @@
 # BlankLogo Deployment Guide
 
-## Architecture Overview
+> **Last Updated:** January 4, 2026  
+> **Deployment Architecture:** Hybrid (Vercel + Render)  
+> **Status:** ✅ Production Ready
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Vercel                                │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  Next.js Web App (apps/web)                           │  │
-│  │  - Dashboard, project creation, downloads             │  │
-│  │  - API routes for job creation, status                │  │
-│  │  - Supabase Auth integration                          │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ Supabase (shared DB + Storage)
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                        Railway                               │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  Worker Process (apps/worker)                         │  │
-│  │  - Claims jobs from queue                             │  │
-│  │  - Script generation (OpenAI GPT-4)                   │  │
-│  │  - Voice synthesis (OpenAI TTS / IndexTTS)            │  │
-│  │  - Whisper alignment                                  │  │
-│  │  - Image generation (DALL-E 3)                        │  │
-│  │  - Remotion video rendering                           │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+## 🎯 Production Deployment Summary
 
-## Prerequisites
+This is the **official production deployment configuration** for BlankLogo.
 
-- [Vercel account](https://vercel.com)
-- [Railway account](https://railway.app)
-- [Supabase project](https://supabase.com) (production)
-- OpenAI API key
-- (Optional) HuggingFace token for IndexTTS voice cloning
+| Service | Platform | URL | Status |
+|---------|----------|-----|--------|
+| **Web App** | Vercel | https://www.blanklogo.app | ✅ Live |
+| **API** | Render | https://blanklogo-api.onrender.com | ✅ Live |
+| **Worker** | Render | Background Worker | ✅ Deployed |
+| **Redis** | Render | Internal (Valkey 8) | ✅ Available |
+| **Database** | Supabase | https://cwnayaqzslaukjlwkzlo.supabase.co | ✅ Connected |
 
 ---
 
-## 1. Supabase Production Setup
+## 🏗️ Architecture Overview
 
-### Create Project
-1. Go to [supabase.com](https://supabase.com) → New Project
-2. Choose a region close to your users
-3. Save the project URL and keys
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              VERCEL                                          │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Next.js 14 Web App (apps/web)                                        │  │
+│  │  ─────────────────────────────────────────────────────────────────────│  │
+│  │  • Homepage & Landing Pages                                           │  │
+│  │  • User Authentication (Supabase Auth)                                │  │
+│  │  • Dashboard & App Pages                                              │  │
+│  │  • Stripe Payment Integration                                         │  │
+│  │  • API Routes (/api/*)                                                │  │
+│  │                                                                       │  │
+│  │  Domains:                                                             │  │
+│  │    - www.blanklogo.app                                                │  │
+│  │    - blanklogo-web-git-main-isaiahduprees-projects.vercel.app         │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ HTTPS API Calls
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              RENDER                                          │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Express API Server (apps/api)                          [Web Service] │  │
+│  │  ─────────────────────────────────────────────────────────────────────│  │
+│  │  • RESTful API endpoints (/api/v1/*)                                  │  │
+│  │  • Job queue management (BullMQ)                                      │  │
+│  │  • Health checks (/health, /healthz, /readyz)                         │  │
+│  │  • Platform detection & watermark removal API                         │  │
+│  │                                                                       │  │
+│  │  URL: https://blanklogo-api.onrender.com                              │  │
+│  │  Port: 8989                                                           │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    │                                         │
+│                                    │ Redis Queue                             │
+│                                    ▼                                         │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Redis (Valkey 8)                                     [Redis Service] │  │
+│  │  ─────────────────────────────────────────────────────────────────────│  │
+│  │  • Job queue (BullMQ watermark-removal queue)                         │  │
+│  │  • Session caching                                                    │  │
+│  │                                                                       │  │
+│  │  Internal URL: redis://red-d5ddu9khg0os73f75170:6379                  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    │                                         │
+│                                    │ Job Processing                          │
+│                                    ▼                                         │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Background Worker (apps/worker)                 [Background Worker]  │  │
+│  │  ─────────────────────────────────────────────────────────────────────│  │
+│  │  • Processes watermark removal jobs                                   │  │
+│  │  • Video download (curl, yt-dlp, Puppeteer)                           │  │
+│  │  • FFmpeg video processing                                            │  │
+│  │  • AI inpainting (YOLO + LAMA)                                        │  │
+│  │  • Upload to Supabase Storage                                         │  │
+│  │  • User notifications (Resend)                                        │  │
+│  │                                                                       │  │
+│  │  Type: Background Worker (no HTTP port)                               │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ Database & Storage
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             SUPABASE                                         │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  PostgreSQL Database                                                  │  │
+│  │  • Users, jobs, projects, credits tables                              │  │
+│  │  • Row Level Security (RLS)                                           │  │
+│  │                                                                       │  │
+│  │  Object Storage                                                       │  │
+│  │  • bl_videos bucket for processed videos                              │  │
+│  │                                                                       │  │
+│  │  Authentication                                                       │  │
+│  │  • Email/password auth                                                │  │
+│  │  • OAuth providers (optional)                                         │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-### Run Migrations
+---
+
+## 📁 Repository Structure
+
+```
+BlankLogo/
+├── apps/
+│   ├── api/                 # Express API server (Render)
+│   │   ├── src/
+│   │   │   ├── index.ts     # Main server entry
+│   │   │   ├── routes/      # API routes
+│   │   │   └── middleware/  # Auth, rate limiting
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── web/                 # Next.js web app (Vercel)
+│   │   ├── src/
+│   │   │   ├── app/         # App Router pages
+│   │   │   ├── components/  # React components
+│   │   │   └── lib/         # Utilities
+│   │   ├── package.json
+│   │   ├── vercel.json      # Vercel config
+│   │   └── next.config.mjs
+│   │
+│   └── worker/              # Background worker (Render)
+│       ├── src/
+│       │   ├── index.ts     # Worker entry
+│       │   ├── download.ts  # Video download
+│       │   └── userNotify.ts # Notifications
+│       ├── package.json
+│       └── tsconfig.json
+│
+├── packages/
+│   └── shared/              # Shared types & utilities
+│
+├── scripts/
+│   ├── check-render-status.sh    # Check Render deployments
+│   └── test-production.sh        # Production test suite
+│
+├── tests/                   # Test suites
+│   ├── api/                 # API tests
+│   ├── unit/                # Unit tests
+│   ├── worker/              # Worker tests
+│   ├── integration/         # Integration tests
+│   └── security/            # Security tests
+│
+├── docs/
+│   └── DEPLOYMENT.md        # This file
+│
+├── render.yaml              # Render Blueprint
+├── package.json             # Root package.json
+├── pnpm-workspace.yaml      # pnpm workspace config
+└── pnpm-lock.yaml           # Lock file
+```
+
+---
+
+## 🚀 Deployment Configuration
+
+### Render Blueprint (`render.yaml`)
+
+The `render.yaml` file defines all Render services:
+
+```yaml
+services:
+  # Redis Database
+  - type: redis
+    name: blanklogo-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+  # API Server (Web Service)
+  - type: web
+    name: blanklogo-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: "npm install -g pnpm && NODE_ENV=development pnpm install && pnpm --filter @blanklogo/api build"
+    startCommand: "NODE_ENV=production node apps/api/dist/index.js"
+    healthCheckPath: /health
+
+  # Background Worker
+  - type: worker
+    name: blanklogo-worker
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: "npm install -g pnpm && NODE_ENV=development pnpm install && pnpm --filter @blanklogo/worker build"
+    startCommand: "NODE_ENV=production node apps/worker/dist/index.js"
+```
+
+### Vercel Configuration (`apps/web/vercel.json`)
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "outputDirectory": ".next"
+}
+```
+
+---
+
+## 🔑 Environment Variables
+
+### Render Environment Group: `blanklogo-secrets`
+
+Create an environment group in Render with these variables:
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key |
+| `RESEND_API_KEY` | Resend email API key |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
+
+Link this group to both `blanklogo-api` and `blanklogo-worker` services.
+
+### Vercel Environment Variables
+
+Add these in Vercel Dashboard → Project Settings → Environment Variables:
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+| `NEXT_PUBLIC_API_URL` | Render API URL (`https://blanklogo-api.onrender.com`) |
+| `RESEND_API_KEY` | Resend email API key |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
+
+---
+
+## 🧪 Testing
+
+### Run Production Tests
+
 ```bash
-# Link to your production project
-supabase link --project-ref YOUR_PROJECT_REF
+# Full production test suite
+./scripts/test-production.sh
 
-# Push all migrations
-supabase db push
+# Local unit tests
+pnpm test
 
-# Create storage buckets
-supabase storage create project-assets
-supabase storage create project-outputs
+# Specific test categories
+pnpm test tests/unit/
+pnpm test tests/api/
+pnpm test tests/worker/
+pnpm test tests/integration/
 ```
 
-### Environment Variables (save these)
-- `SUPABASE_URL` - Project URL
-- `SUPABASE_ANON_KEY` - Public anon key
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (keep secret!)
+### Manual Health Checks
 
----
-
-## 2. Vercel Deployment (Web App)
-
-### Connect Repository
-1. Go to [vercel.com](https://vercel.com) → Add New Project
-2. Import your GitHub repository
-3. Set **Root Directory** to `apps/web`
-4. Framework Preset: **Next.js**
-
-### Environment Variables
-Add these in Vercel dashboard → Settings → Environment Variables:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
-RESEND_API_KEY=re_xxxxx
-STRIPE_SECRET_KEY=sk_live_xxxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxxx
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxxxx
-INTERNAL_NOTIFY_SECRET=your-random-secret-here
-```
-
-### Deploy
 ```bash
-# Or just push to main branch
-vercel --prod
+# API Health
+curl https://blanklogo-api.onrender.com/health
+
+# API Capabilities
+curl https://blanklogo-api.onrender.com/capabilities
+
+# API Platforms
+curl https://blanklogo-api.onrender.com/api/v1/platforms
+
+# Vercel Web
+curl -I https://www.blanklogo.app
 ```
 
 ---
 
-## 3. Railway Deployment (Worker)
+## 📊 Monitoring
 
-### Create Project
-1. Go to [railway.app](https://railway.app) → New Project
-2. Deploy from GitHub repo
-3. Set **Root Directory** to `/` (monorepo root)
-4. Railway will auto-detect the Dockerfile at `apps/worker/Dockerfile`
+### Render Dashboard
+- https://dashboard.render.com
+- View logs, deployments, metrics
 
-### Environment Variables
-Add in Railway dashboard → Variables:
+### Vercel Dashboard
+- https://vercel.com/dashboard
+- View deployments, analytics, logs
 
-```
-# Supabase
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
+### Check Deployment Status
 
-# OpenAI
-OPENAI_API_KEY=sk-xxxxx
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TTS_VOICE=onyx
-
-# Worker config
-WORKER_ID=worker-prod-1
-POLL_INTERVAL_MS=1000
-MAX_ACTIVE_PER_USER=1
-
-# TTS Provider
-TTS_PROVIDER=openai
-
-# Optional: HuggingFace for IndexTTS
-HF_TOKEN=hf_xxxxx
-
-# App URL for notifications
-APP_BASE_URL=https://your-app.vercel.app
-INTERNAL_NOTIFY_SECRET=your-random-secret-here
-
-# Image generation
-IMAGE_PROVIDER=openai
-DALLE_SIZE=1024x1024
-DALLE_QUALITY=standard
-
-# Remotion
-REMOTION_CONCURRENCY=2
-NODE_ENV=production
-```
-
-### Deploy
-Railway auto-deploys on push to main. Manual deploy:
 ```bash
-railway up
+./scripts/check-render-status.sh
 ```
 
-### Scaling
-- **Starter**: 1 replica, 512MB RAM (~$5/mo)
-- **Pro**: 2 replicas, 2GB RAM each (~$20/mo)
-- Adjust in Railway dashboard → Settings → Deploy
+---
+
+## 🔧 Common Operations
+
+### Deploy Updates
+
+```bash
+# Push to main branch triggers auto-deploy
+git push origin main
+
+# Check deployment status
+./scripts/check-render-status.sh
+```
+
+### Rollback
+
+**Render:**
+1. Go to Service → Deployments
+2. Click on previous successful deployment
+3. Click "Rollback to this deploy"
+
+**Vercel:**
+1. Go to Deployments
+2. Find previous deployment
+3. Click "..." → Promote to Production
+
+### View Logs
+
+```bash
+# Render logs (requires render CLI)
+render logs -r srv-xxx
+
+# Or use dashboard:
+# https://dashboard.render.com/web/srv-xxx/logs
+```
 
 ---
 
-## 4. Domain Setup
+## 💰 Cost Estimates
 
-### Vercel (Web App)
-1. Settings → Domains → Add Domain
-2. Add your domain (e.g., `app.blanklogo.com`)
-3. Configure DNS as instructed
-
-### Update Environment Variables
-After setting domains, update:
-- `APP_BASE_URL` in Railway worker
-- OAuth redirect URLs in Supabase Auth
-
----
-
-## 5. Monitoring
-
-### Vercel
-- Built-in analytics and logs
-- Enable Web Analytics in project settings
-
-### Railway
-- View logs: Railway dashboard → Deployments → View Logs
-- Set up alerts for crashes
-
-### Supabase
-- Database usage in dashboard
-- Enable logging for debugging
-
----
-
-## 6. Cost Estimates
-
-| Service | Tier | Monthly Cost |
+| Service | Plan | Monthly Cost |
 |---------|------|--------------|
-| Vercel | Pro | $20 |
-| Railway | Starter | $5-20 |
-| Supabase | Pro | $25 |
-| OpenAI | Pay-as-you-go | $50-200 (usage) |
-| **Total** | | **$100-265/mo** |
-
-### Per-Video Costs (10-minute video)
-- GPT-4 script: ~$0.10
-- OpenAI TTS: ~$0.45
-- Whisper: ~$0.06
-- DALL-E 3 (10 images): ~$0.40
-- **Total**: ~$1.00-1.50
+| Vercel Web | Pro | ~$20 |
+| Render API | Free | $0 |
+| Render Worker | Free | $0 |
+| Render Redis | Free | $0 |
+| Supabase | Free/Pro | $0-25 |
+| Stripe | Pay-as-you-go | 2.9% + 30¢ |
+| Resend | Free tier | $0 |
+| **Total** | | **$20-45/mo** |
 
 ---
 
-## Troubleshooting
+## 🆘 Troubleshooting
 
 ### Worker not processing jobs
-1. Check Railway logs for errors
-2. Verify `SUPABASE_SERVICE_ROLE_KEY` is correct
-3. Ensure jobs are in `QUEUED` status in database
+1. Check Worker logs in Render dashboard
+2. Verify Redis connection: API `/health` should show `redis: connected`
+3. Verify environment variables are set
 
-### Video rendering fails
-1. Check Railway memory usage (may need more RAM)
-2. Verify Chromium is installed (check Dockerfile)
-3. Check Remotion logs for specific errors
+### API returning errors
+1. Check API logs in Render dashboard
+2. Verify Supabase connection
+3. Check rate limiting
 
-### TTS fails
-1. Verify `OPENAI_API_KEY` has TTS access
-2. Check OpenAI usage limits
-3. If using IndexTTS, verify `HF_TOKEN` and quota
+### Vercel build fails
+1. Check build logs in Vercel dashboard
+2. Verify environment variables
+3. Check for TypeScript errors
+
+### Redis connection issues
+1. Verify `REDIS_URL` is set correctly (from Render Redis)
+2. Check Redis service is running in Render dashboard
 
 ---
 
-## Local Development
+## 📚 Additional Documentation
 
-```bash
-# Terminal 1: Start Supabase
-supabase start
+- [API Documentation](./API.md)
+- [Worker Pipeline](./WORKER.md)
+- [Database Schema](./DATABASE.md)
+- [Testing Guide](./TESTING.md)
 
-# Terminal 2: Start web app
-pnpm --filter @blanklogo/web dev
+---
 
-# Terminal 3: Start worker
-pnpm --filter @blanklogo/worker dev
-```
+## ✅ Deployment Checklist
+
+- [ ] All environment variables configured in Render
+- [ ] All environment variables configured in Vercel
+- [ ] Supabase redirect URLs configured
+- [ ] Stripe webhook endpoint configured
+- [ ] Custom domain configured (if applicable)
+- [ ] SSL certificates active
+- [ ] Production tests passing (`./scripts/test-production.sh`)
+- [ ] Monitoring alerts configured
