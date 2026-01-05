@@ -6,10 +6,26 @@ import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import * as http from "http";
 import { downloadVideo, checkCapabilities } from "./download.js";
 import { notifyJobStarted, notifyJobCompleted, notifyJobFailed, notifyCreditsLow } from "./userNotify.js";
 
 const WORKER_ID = process.env.WORKER_ID ?? `worker-${Math.random().toString(16).slice(2, 10)}`;
+
+// Health check server for Render
+const PORT = Number(process.env.PORT) || 10000;
+const healthServer = http.createServer((req, res) => {
+  if (req.url === "/health" || req.url === "/") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "healthy", worker: WORKER_ID, timestamp: new Date().toISOString() }));
+  } else {
+    res.writeHead(404);
+    res.end("Not found");
+  }
+});
+healthServer.listen(PORT, () => {
+  console.log(`[Worker] Health check server listening on port ${PORT}`);
+});
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? 2);
 const INPAINT_SERVICE_URL = process.env.INPAINT_SERVICE_URL || "http://localhost:8081";
