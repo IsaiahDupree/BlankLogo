@@ -221,19 +221,22 @@ export default function CreditsPage() {
           </div>
         </div>
 
-        {subscriptionTier && (
-          <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-            <div className="text-sm text-gray-400">
-              Active subscription: <span className="text-white font-medium capitalize">{subscriptionTier.replace("_", " ")}</span>
-            </div>
-            <button
-              onClick={handleManageSubscription}
-              className="text-sm text-brand-400 hover:text-brand-300 flex items-center gap-1"
-            >
-              Manage subscription <ExternalLink className="w-4 h-4" />
-            </button>
+        {/* Always show Manage Subscription button */}
+        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+          <div className="text-sm text-gray-400">
+            {subscriptionTier ? (
+              <>Active subscription: <span className="text-white font-medium capitalize">{subscriptionTier.replace("_", " ")}</span></>
+            ) : (
+              <>No active subscription</>
+            )}
           </div>
-        )}
+          <button
+            onClick={handleManageSubscription}
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-500 rounded-lg text-sm font-medium flex items-center gap-2 transition"
+          >
+            Manage Subscription <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Subscription Plans */}
