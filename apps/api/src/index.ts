@@ -726,6 +726,215 @@ app.get('/status', async (req, res) => {
   res.json(status);
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// DIAGNOSTICS ENDPOINT - Self-test all connections
+// ═══════════════════════════════════════════════════════════════════
+app.get('/diagnostics', async (req, res) => {
+  console.log('[DIAGNOSTICS] Running comprehensive diagnostics...');
+  const startTime = Date.now();
+  
+  interface TestResult {
+    name: string;
+    status: 'pass' | 'fail' | 'warn';
+    latencyMs: number;
+    details?: string;
+    error?: string;
+  }
+  
+  const tests: TestResult[] = [];
+  
+  // Test 1: Redis Connection
+  const redisStart = Date.now();
+  try {
+    if (redis) {
+      const pong = await redis.ping();
+      tests.push({
+        name: 'redis_connection',
+        status: pong === 'PONG' ? 'pass' : 'fail',
+        latencyMs: Date.now() - redisStart,
+        details: `Response: ${pong}`,
+      });
+    } else {
+      tests.push({
+        name: 'redis_connection',
+        status: 'fail',
+        latencyMs: Date.now() - redisStart,
+        error: 'Redis client not initialized',
+      });
+    }
+  } catch (err) {
+    tests.push({
+      name: 'redis_connection',
+      status: 'fail',
+      latencyMs: Date.now() - redisStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 2: Redis Read/Write
+  const redisRWStart = Date.now();
+  try {
+    if (redis) {
+      const testKey = `diag_test_${Date.now()}`;
+      await redis.set(testKey, 'test_value', 'EX', 10);
+      const value = await redis.get(testKey);
+      await redis.del(testKey);
+      tests.push({
+        name: 'redis_read_write',
+        status: value === 'test_value' ? 'pass' : 'fail',
+        latencyMs: Date.now() - redisRWStart,
+        details: 'SET/GET/DEL cycle completed',
+      });
+    } else {
+      tests.push({
+        name: 'redis_read_write',
+        status: 'fail',
+        latencyMs: Date.now() - redisRWStart,
+        error: 'Redis client not available',
+      });
+    }
+  } catch (err) {
+    tests.push({
+      name: 'redis_read_write',
+      status: 'fail',
+      latencyMs: Date.now() - redisRWStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 3: BullMQ Queue
+  const queueStart = Date.now();
+  try {
+    if (jobQueue) {
+      const [waiting, active] = await Promise.all([
+        jobQueue.getWaitingCount(),
+        jobQueue.getActiveCount(),
+      ]);
+      tests.push({
+        name: 'bullmq_queue',
+        status: 'pass',
+        latencyMs: Date.now() - queueStart,
+        details: `Waiting: ${waiting}, Active: ${active}`,
+      });
+    } else {
+      tests.push({
+        name: 'bullmq_queue',
+        status: 'fail',
+        latencyMs: Date.now() - queueStart,
+        error: 'Job queue not initialized',
+      });
+    }
+  } catch (err) {
+    tests.push({
+      name: 'bullmq_queue',
+      status: 'fail',
+      latencyMs: Date.now() - queueStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 4: Supabase Connection
+  const supabaseStart = Date.now();
+  try {
+    const { data, error } = await supabase.from('bl_jobs').select('id').limit(1);
+    tests.push({
+      name: 'supabase_connection',
+      status: error ? 'fail' : 'pass',
+      latencyMs: Date.now() - supabaseStart,
+      details: error ? undefined : 'Query executed successfully',
+      error: error?.message,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'supabase_connection',
+      status: 'fail',
+      latencyMs: Date.now() - supabaseStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 5: Supabase Auth
+  const authStart = Date.now();
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    tests.push({
+      name: 'supabase_auth',
+      status: error ? 'warn' : 'pass',
+      latencyMs: Date.now() - authStart,
+      details: 'Auth service reachable',
+      error: error?.message,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'supabase_auth',
+      status: 'fail',
+      latencyMs: Date.now() - authStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 6: Supabase Storage
+  const storageStart = Date.now();
+  try {
+    const { data, error } = await supabase.storage.listBuckets();
+    tests.push({
+      name: 'supabase_storage',
+      status: error ? 'fail' : 'pass',
+      latencyMs: Date.now() - storageStart,
+      details: error ? undefined : `${data?.length || 0} buckets available`,
+      error: error?.message,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'supabase_storage',
+      status: 'fail',
+      latencyMs: Date.now() - storageStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 7: Environment Configuration
+  const envChecks = {
+    REDIS_URL: !!process.env.REDIS_URL,
+    SUPABASE_URL: !!process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+    PORT: !!process.env.PORT,
+  };
+  const missingEnv = Object.entries(envChecks).filter(([k, v]) => !v).map(([k]) => k);
+  tests.push({
+    name: 'environment_config',
+    status: missingEnv.length === 0 ? 'pass' : 'warn',
+    latencyMs: 0,
+    details: missingEnv.length === 0 ? 'All required env vars set' : `Missing: ${missingEnv.join(', ')}`,
+  });
+  
+  // Summary
+  const passed = tests.filter(t => t.status === 'pass').length;
+  const failed = tests.filter(t => t.status === 'fail').length;
+  const warned = tests.filter(t => t.status === 'warn').length;
+  
+  const overallStatus = failed > 0 ? 'unhealthy' : warned > 0 ? 'degraded' : 'healthy';
+  
+  console.log(`[DIAGNOSTICS] Complete: ${passed} passed, ${failed} failed, ${warned} warnings`);
+  
+  res.status(failed > 0 ? 503 : 200).json({
+    service: SERVICE_NAME,
+    run_id: RUN_ID,
+    timestamp: new Date().toISOString(),
+    duration_ms: Date.now() - startTime,
+    overall_status: overallStatus,
+    summary: {
+      total: tests.length,
+      passed,
+      failed,
+      warned,
+    },
+    tests,
+    environment: process.env.NODE_ENV || 'development',
+    version: capabilities.build.version,
+  });
+});
+
 // Debug endpoint (only in development)
 if (process.env.NODE_ENV !== 'production') {
   app.get('/debug', (req, res) => {

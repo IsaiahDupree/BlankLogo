@@ -68,6 +68,11 @@
     "test:deployment": "playwright test tests/deployment",
     "test:deployment:smoke": "playwright test tests/deployment/smoke-tests.spec.ts",
     "test:deployment:health": "playwright test tests/deployment/health-checks.spec.ts",
+    "check:deployment": "bash scripts/check-deployment.sh",
+    "check:deployment:prod": "DEPLOY_API_URL=https://blanklogo-api.onrender.com DEPLOY_WEB_URL=https://www.blanklogo.app bash scripts/check-deployment.sh",
+    "check:deployment:local": "DEPLOY_API_URL=http://localhost:8989 DEPLOY_WEB_URL=http://localhost:3939 bash scripts/check-deployment.sh",
+    "diagnostics:api": "curl -s ${API_URL:-http://localhost:8989}/diagnostics | jq .",
+    "diagnostics:api:prod": "curl -s https://blanklogo-api.onrender.com/diagnostics | jq .",
     "deploy:notify": "npx tsx scripts/deploy-notify.ts",
     "deploy:notify:success": "npx tsx scripts/deploy-notify.ts --status=success",
     "deploy:notify:failure": "npx tsx scripts/deploy-notify.ts --status=failure"

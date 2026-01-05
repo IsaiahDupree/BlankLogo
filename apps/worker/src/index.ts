@@ -11,22 +11,243 @@ import { downloadVideo, checkCapabilities } from "./download.js";
 import { notifyJobStarted, notifyJobCompleted, notifyJobFailed, notifyCreditsLow } from "./userNotify.js";
 
 const WORKER_ID = process.env.WORKER_ID ?? `worker-${Math.random().toString(16).slice(2, 10)}`;
+const SERVICE_NAME = 'worker';
+const RUN_ID = `${SERVICE_NAME}-${Math.random().toString(16).slice(2, 10)}`;
+const startTimestamp = Date.now();
 
-// Health check server for Render
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+
+// Redis client for diagnostics (created early so it's available for health checks)
+let redisClient: Redis | null = null;
+let redisConnected = false;
+
+// Health check server for Render with diagnostics
 const PORT = Number(process.env.PORT) || 10000;
-const healthServer = http.createServer((req, res) => {
-  if (req.url === "/health" || req.url === "/") {
+
+async function runDiagnostics(): Promise<{
+  overall_status: string;
+  summary: { total: number; passed: number; failed: number; warned: number };
+  tests: Array<{ name: string; status: string; latencyMs: number; details?: string; error?: string }>;
+}> {
+  const tests: Array<{ name: string; status: 'pass' | 'fail' | 'warn'; latencyMs: number; details?: string; error?: string }> = [];
+  
+  // Test 1: Redis Connection
+  const redisStart = Date.now();
+  try {
+    if (redisClient) {
+      const pong = await redisClient.ping();
+      tests.push({
+        name: 'redis_connection',
+        status: pong === 'PONG' ? 'pass' : 'fail',
+        latencyMs: Date.now() - redisStart,
+        details: `Response: ${pong}`,
+      });
+    } else {
+      tests.push({
+        name: 'redis_connection',
+        status: 'fail',
+        latencyMs: Date.now() - redisStart,
+        error: 'Redis client not initialized',
+      });
+    }
+  } catch (err) {
+    tests.push({
+      name: 'redis_connection',
+      status: 'fail',
+      latencyMs: Date.now() - redisStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 2: Supabase Connection
+  const supabaseStart = Date.now();
+  try {
+    const { data, error } = await supabase.from('bl_jobs').select('id').limit(1);
+    tests.push({
+      name: 'supabase_connection',
+      status: error ? 'fail' : 'pass',
+      latencyMs: Date.now() - supabaseStart,
+      details: error ? undefined : 'Query executed successfully',
+      error: error?.message,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'supabase_connection',
+      status: 'fail',
+      latencyMs: Date.now() - supabaseStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 3: Supabase Storage
+  const storageStart = Date.now();
+  try {
+    const { data, error } = await supabase.storage.listBuckets();
+    tests.push({
+      name: 'supabase_storage',
+      status: error ? 'fail' : 'pass',
+      latencyMs: Date.now() - storageStart,
+      details: error ? undefined : `${data?.length || 0} buckets available`,
+      error: error?.message,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'supabase_storage',
+      status: 'fail',
+      latencyMs: Date.now() - storageStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 4: FFmpeg availability
+  const ffmpegStart = Date.now();
+  try {
+    const ffmpegCheck = await new Promise<boolean>((resolve) => {
+      const proc = spawn('ffmpeg', ['-version']);
+      proc.on('close', (code) => resolve(code === 0));
+      proc.on('error', () => resolve(false));
+      setTimeout(() => { proc.kill(); resolve(false); }, 5000);
+    });
+    tests.push({
+      name: 'ffmpeg_available',
+      status: ffmpegCheck ? 'pass' : 'fail',
+      latencyMs: Date.now() - ffmpegStart,
+      details: ffmpegCheck ? 'FFmpeg is available' : undefined,
+      error: ffmpegCheck ? undefined : 'FFmpeg not found in PATH',
+    });
+  } catch (err) {
+    tests.push({
+      name: 'ffmpeg_available',
+      status: 'fail',
+      latencyMs: Date.now() - ffmpegStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 5: Download capabilities
+  const capsStart = Date.now();
+  try {
+    const caps = await checkCapabilities();
+    const availableMethods = Object.entries(caps).filter(([k, v]) => v).map(([k]) => k);
+    tests.push({
+      name: 'download_capabilities',
+      status: availableMethods.length > 0 ? 'pass' : 'warn',
+      latencyMs: Date.now() - capsStart,
+      details: `Available: ${availableMethods.join(', ') || 'none'}`,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'download_capabilities',
+      status: 'warn',
+      latencyMs: Date.now() - capsStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  // Test 6: Environment Configuration
+  const envChecks = {
+    REDIS_URL: !!process.env.REDIS_URL,
+    SUPABASE_URL: !!process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+    WORKER_ID: !!process.env.WORKER_ID,
+  };
+  const missingEnv = Object.entries(envChecks).filter(([k, v]) => !v).map(([k]) => k);
+  tests.push({
+    name: 'environment_config',
+    status: missingEnv.length === 0 ? 'pass' : 'warn',
+    latencyMs: 0,
+    details: missingEnv.length === 0 ? 'All required env vars set' : `Missing: ${missingEnv.join(', ')}`,
+  });
+  
+  // Test 7: Temp directory writable
+  const tmpStart = Date.now();
+  try {
+    const testDir = path.join(os.tmpdir(), `diag_test_${Date.now()}`);
+    fs.mkdirSync(testDir);
+    fs.writeFileSync(path.join(testDir, 'test.txt'), 'test');
+    fs.rmSync(testDir, { recursive: true });
+    tests.push({
+      name: 'temp_directory',
+      status: 'pass',
+      latencyMs: Date.now() - tmpStart,
+      details: `Temp dir writable: ${os.tmpdir()}`,
+    });
+  } catch (err) {
+    tests.push({
+      name: 'temp_directory',
+      status: 'fail',
+      latencyMs: Date.now() - tmpStart,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+  
+  const passed = tests.filter(t => t.status === 'pass').length;
+  const failed = tests.filter(t => t.status === 'fail').length;
+  const warned = tests.filter(t => t.status === 'warn').length;
+  const overallStatus = failed > 0 ? 'unhealthy' : warned > 0 ? 'degraded' : 'healthy';
+  
+  return {
+    overall_status: overallStatus,
+    summary: { total: tests.length, passed, failed, warned },
+    tests,
+  };
+}
+
+const healthServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url || '/', `http://localhost:${PORT}`);
+  
+  if (url.pathname === "/health" || url.pathname === "/") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "healthy", worker: WORKER_ID, timestamp: new Date().toISOString() }));
+    res.end(JSON.stringify({
+      status: "healthy",
+      service: SERVICE_NAME,
+      worker: WORKER_ID,
+      run_id: RUN_ID,
+      uptime_ms: Date.now() - startTimestamp,
+      timestamp: new Date().toISOString(),
+    }));
+  } else if (url.pathname === "/diagnostics") {
+    console.log('[Worker] Running diagnostics...');
+    const diagStart = Date.now();
+    try {
+      const results = await runDiagnostics();
+      const response = {
+        service: SERVICE_NAME,
+        worker: WORKER_ID,
+        run_id: RUN_ID,
+        timestamp: new Date().toISOString(),
+        duration_ms: Date.now() - diagStart,
+        uptime_ms: Date.now() - startTimestamp,
+        ...results,
+      };
+      console.log(`[Worker] Diagnostics complete: ${results.summary.passed} passed, ${results.summary.failed} failed`);
+      res.writeHead(results.summary.failed > 0 ? 503 : 200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(response));
+    } catch (err) {
+      console.error('[Worker] Diagnostics error:', err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: 'Diagnostics failed', message: err instanceof Error ? err.message : 'Unknown error' }));
+    }
+  } else if (url.pathname === "/readyz") {
+    const isReady = redisConnected;
+    res.writeHead(isReady ? 200 : 503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      ready: isReady,
+      service: SERVICE_NAME,
+      worker: WORKER_ID,
+      redis: redisConnected ? 'connected' : 'disconnected',
+      timestamp: new Date().toISOString(),
+    }));
   } else {
     res.writeHead(404);
     res.end("Not found");
   }
 });
+
 healthServer.listen(PORT, () => {
   console.log(`[Worker] Health check server listening on port ${PORT}`);
+  console.log(`[Worker] Endpoints: /health, /diagnostics, /readyz`);
 });
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? 2);
 const INPAINT_SERVICE_URL = process.env.INPAINT_SERVICE_URL || "http://localhost:8081";
 
@@ -1034,12 +1255,21 @@ async function main(): Promise<void> {
 
   const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
   
+  // Set global redis client for diagnostics
+  redisClient = redis;
+  
   redis.on('connect', () => {
     console.log(`[Worker] ✅ Redis connected: ${REDIS_URL}`);
+    redisConnected = true;
   });
   
   redis.on('error', (err) => {
     console.error(`[Worker] ❌ Redis error:`, err.message);
+    redisConnected = false;
+  });
+  
+  redis.on('close', () => {
+    redisConnected = false;
   });
 
   const worker = new BullWorker<JobData>(

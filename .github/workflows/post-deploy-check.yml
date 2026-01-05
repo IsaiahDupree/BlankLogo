@@ -1,0 +1,174 @@
+name: Post-Deploy Health Check
+
+on:
+  # Run manually from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to check'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+  
+  # Run on deploy webhook from Render (optional)
+  repository_dispatch:
+    types: [deploy-completed]
+  
+  # Run on schedule (every 6 hours)
+  schedule:
+    - cron: '0 */6 * * *'
+
+env:
+  # Production URLs
+  PROD_API_URL: https://blanklogo-api.onrender.com
+  PROD_WEB_URL: https://www.blanklogo.app
+  # Staging URLs (update if you have staging environment)
+  STAGING_API_URL: https://blanklogo-api-staging.onrender.com
+  STAGING_WEB_URL: https://staging.blanklogo.app
+
+jobs:
+  health-check:
+    name: Deployment Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install jq
+        run: sudo apt-get install -y jq
+      
+      - name: Set environment URLs
+        id: set-urls
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "API_URL=${{ env.STAGING_API_URL }}" >> $GITHUB_OUTPUT
+            echo "WEB_URL=${{ env.STAGING_WEB_URL }}" >> $GITHUB_OUTPUT
+            echo "ENV_NAME=staging" >> $GITHUB_OUTPUT
+          else
+            echo "API_URL=${{ env.PROD_API_URL }}" >> $GITHUB_OUTPUT
+            echo "WEB_URL=${{ env.PROD_WEB_URL }}" >> $GITHUB_OUTPUT
+            echo "ENV_NAME=production" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Wait for deployment to stabilize
+        run: sleep 30
+      
+      - name: Check API Health
+        id: api-health
+        run: |
+          echo "🔍 Checking API health at ${{ steps.set-urls.outputs.API_URL }}"
+          
+          HEALTH=$(curl -s --max-time 30 "${{ steps.set-urls.outputs.API_URL }}/health" || echo '{"status":"error"}')
+          echo "Health response: $HEALTH"
+          
+          STATUS=$(echo "$HEALTH" | jq -r '.status // "error"')
+          if [ "$STATUS" = "healthy" ]; then
+            echo "✅ API is healthy"
+            echo "status=healthy" >> $GITHUB_OUTPUT
+          else
+            echo "❌ API health check failed: $STATUS"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run API Diagnostics
+        id: api-diagnostics
+        run: |
+          echo "🔍 Running API diagnostics..."
+          
+          DIAG=$(curl -s --max-time 60 "${{ steps.set-urls.outputs.API_URL }}/diagnostics" || echo '{"overall_status":"error"}')
+          echo "Diagnostics response:"
+          echo "$DIAG" | jq .
+          
+          OVERALL=$(echo "$DIAG" | jq -r '.overall_status // "error"')
+          PASSED=$(echo "$DIAG" | jq -r '.summary.passed // 0')
+          FAILED=$(echo "$DIAG" | jq -r '.summary.failed // 0')
+          
+          echo "overall=$OVERALL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          
+          if [ "$OVERALL" = "healthy" ]; then
+            echo "✅ All $PASSED diagnostic tests passed"
+          elif [ "$OVERALL" = "degraded" ]; then
+            echo "⚠️ API is degraded - some tests have warnings"
+          else
+            echo "❌ API diagnostics failed - $FAILED tests failed"
+          fi
+      
+      - name: Check Web Frontend
+        id: web-health
+        run: |
+          echo "🔍 Checking Web frontend at ${{ steps.set-urls.outputs.WEB_URL }}"
+          
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${{ steps.set-urls.outputs.WEB_URL }}" || echo "000")
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Web frontend is accessible (HTTP $HTTP_CODE)"
+            echo "status=healthy" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Web frontend check failed (HTTP $HTTP_CODE)"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check Login Page
+        run: |
+          echo "🔍 Checking login page..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${{ steps.set-urls.outputs.WEB_URL }}/login" || echo "000")
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Login page accessible"
+          else
+            echo "⚠️ Login page returned HTTP $HTTP_CODE"
+          fi
+      
+      - name: Create Summary
+        run: |
+          echo "## 🏥 Deployment Health Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.set-urls.outputs.ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Services" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ steps.api-health.outputs.status == 'healthy' && '✅ Healthy' || '❌ Unhealthy' }} | ${{ steps.set-urls.outputs.API_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ${{ steps.web-health.outputs.status == 'healthy' && '✅ Healthy' || '❌ Unhealthy' }} | ${{ steps.set-urls.outputs.WEB_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### API Diagnostics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Overall Status:** ${{ steps.api-diagnostics.outputs.overall }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests Passed:** ${{ steps.api-diagnostics.outputs.passed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests Failed:** ${{ steps.api-diagnostics.outputs.failed }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Fail if unhealthy
+        if: steps.api-health.outputs.status == 'unhealthy' || steps.api-diagnostics.outputs.overall == 'unhealthy'
+        run: |
+          echo "❌ Deployment health check failed!"
+          exit 1
+
+  notify-on-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: failure()
+    
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "🚨 Deployment health check failed!"
+          echo "Consider setting up Slack/Discord/Email notifications here"
+          # Example: curl to your notification webhook
+          # curl -X POST -H 'Content-Type: application/json' \
+          #   -d '{"text":"🚨 BlankLogo deployment health check failed!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
