@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Zap, Crown, Rocket, CreditCard } from "lucide-react";
+import { Check, Zap, Crown, Rocket, CreditCard, Loader2 } from "lucide-react";
+import { createBrowserClient } from "@supabase/ssr";
 
 // Monthly subscription plans
 const MONTHLY_PLANS = [
@@ -69,10 +71,63 @@ const TIER_ICONS = {
 } as const;
 
 export default function PricingPage() {
+  const router = useRouter();
+  const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
   useEffect(() => {
     console.log("[PRICING PAGE] 💰 Page mounted");
+    // Check if user is logged in
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user);
+    });
     return () => console.log("[PRICING PAGE] 💰 Page unmounted");
-  }, []);
+  }, [supabase.auth]);
+
+  async function handlePurchase(planId: string, isSubscription: boolean = false) {
+    console.log(`[PRICING] 🛒 Purchase: ${planId}, subscription: ${isSubscription}`);
+    
+    // Check if logged in first
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // Redirect to signup with return URL
+      router.push(`/signup?redirect=/app/credits&plan=${planId}`);
+      return;
+    }
+
+    setPurchasing(planId);
+
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          priceId: `price_${planId}`,
+          mode: isSubscription ? "subscription" : "payment",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("[PRICING] No checkout URL:", data);
+        alert("Failed to start checkout. Please try again.");
+      }
+    } catch (err) {
+      console.error("[PRICING] Checkout error:", err);
+      alert("Failed to start checkout. Please try again.");
+    } finally {
+      setPurchasing(null);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -159,16 +214,21 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  <Link
-                    href="/signup"
+                  <button
+                    onClick={() => handlePurchase(plan.id, true)}
+                    disabled={purchasing === plan.id}
                     className={`block w-full py-3 rounded-lg font-semibold text-center transition ${
                       isPopular
                         ? "bg-blue-600 hover:bg-blue-500 text-white"
                         : "bg-white/10 hover:bg-white/20 text-white"
-                    }`}
+                    } disabled:opacity-50`}
                   >
-                    Subscribe
-                  </Link>
+                    {purchasing === plan.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                    ) : (
+                      "Subscribe"
+                    )}
+                  </button>
                 </div>
               );
             })}
@@ -199,12 +259,17 @@ export default function PricingPage() {
                   ${pack.perCredit.toFixed(2)}/credit
                 </div>
 
-                <Link
-                  href="/signup"
-                  className="block w-full py-2 rounded-lg bg-white/10 hover:bg-white/20 font-medium transition text-center"
+                <button
+                  onClick={() => handlePurchase(pack.id, false)}
+                  disabled={purchasing === pack.id}
+                  className="block w-full py-2 rounded-lg bg-white/10 hover:bg-white/20 font-medium transition text-center disabled:opacity-50"
                 >
-                  Buy
-                </Link>
+                  {purchasing === pack.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    "Buy"
+                  )}
+                </button>
               </div>
             ))}
           </div>
