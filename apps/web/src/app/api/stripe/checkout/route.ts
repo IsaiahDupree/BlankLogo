@@ -35,20 +35,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid price ID" }, { status: 400 });
   }
 
-  // Determine mode based on whether it's a subscription or one-time
-  const isSubscription = ["starter", "pro", "business"].some(
-    (tier) => STRIPE_PRICE_IDS[tier as keyof typeof STRIPE_PRICE_IDS] === priceId
-  );
-
-  const checkoutMode = mode ?? (isSubscription ? "subscription" : "payment");
+  // Force payment mode for all prices (subscription prices are currently one-time)
+  // TODO: Change to subscription mode once recurring prices are created in Stripe Dashboard
+  const checkoutMode = "payment" as const;
 
   try {
-    // Check if user has a Stripe customer ID
-    const { data: profile } = await supabase
-      .from("profiles")
+    // Check if user has a Stripe customer ID (try bl_profiles first, then profiles)
+    let profile = null;
+    const { data: blProfile } = await supabase
+      .from("bl_profiles")
       .select("stripe_customer_id")
       .eq("id", user.id)
       .maybeSingle();
+    
+    if (blProfile) {
+      profile = blProfile;
+    } else {
+      const { data: regularProfile } = await supabase
+        .from("profiles")
+        .select("stripe_customer_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = regularProfile;
+    }
 
     let customerId = profile?.stripe_customer_id;
 
@@ -62,9 +71,9 @@ export async function POST(request: Request) {
       });
       customerId = customer.id;
 
-      // Save customer ID to profile (upsert)
+      // Save customer ID to bl_profiles (upsert)
       await supabase
-        .from("profiles")
+        .from("bl_profiles")
         .upsert({
           id: user.id,
           stripe_customer_id: customerId,
@@ -96,13 +105,6 @@ export async function POST(request: Request) {
       metadata: {
         user_id: user.id,
       },
-      ...(checkoutMode === "subscription" && {
-        subscription_data: {
-          metadata: {
-            user_id: user.id,
-          },
-        },
-      }),
     });
 
     console.log("[STRIPE CHECKOUT] ✅ Session created:", session.id, "URL:", session.url);
