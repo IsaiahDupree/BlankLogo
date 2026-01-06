@@ -1114,7 +1114,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
 
     // Update input info in database (keep original input_url for the uploaded file)
     console.log(`[Worker] 📊 Updating video metadata in database...`);
-    await supabase
+    const { error: metadataError } = await supabase
       .from("bl_jobs")
       .update({
         input_size_bytes: inputSize,
@@ -1122,6 +1122,9 @@ async function processJob(job: Job<JobData>): Promise<void> {
         // Don't overwrite input_url - it should stay pointing to the uploaded file
       })
       .eq("id", jobId);
+    if (metadataError) {
+      console.warn(`[Worker] ⚠️ Failed to update metadata:`, metadataError.message);
+    }
 
     // Remove watermark
     await updateProgress(40, "Removing watermark");
@@ -1151,7 +1154,8 @@ async function processJob(job: Job<JobData>): Promise<void> {
     // Update job as completed
     await updateProgress(90, "Finalizing");
     console.log(`[Worker] 📊 Step 6/6: Finalizing job...`);
-    await supabase
+    const expirationDays = parseInt(process.env.JOB_EXPIRATION_DAYS || '7');
+    const { error: completeError } = await supabase
       .from("bl_jobs")
       .update({
         status: "completed",
@@ -1162,23 +1166,41 @@ async function processJob(job: Job<JobData>): Promise<void> {
         output_size_bytes: outputSize,
         processing_time_ms: processingTime,
         completed_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        expires_at: new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toISOString(),
       })
       .eq("id", jobId);
+    if (completeError) {
+      console.error(`[Worker] ❌ Failed to update job completion:`, completeError.message);
+    }
 
     // Finalize credits for this job (convert reserved to charged)
     // Charge based on ACTUAL method used, not requested mode
     if (job.data.userId) {
       const creditsToCharge = processResult.mode === 'inpaint' ? 2 : 1;
-      const { error: finalizeError } = await supabase.rpc('bl_finalize_credits', {
-        p_user_id: job.data.userId,
-        p_job_id: jobId,
-        p_final_cost: creditsToCharge,
-      });
-      if (finalizeError) {
-        console.error(`[Worker] ⚠️ Error finalizing credits:`, finalizeError.message);
-      } else {
-        console.log(`[Worker] 💰 Finalized ${creditsToCharge} credit(s) for job ${jobId}`);
+      const maxRetries = 3;
+      let finalizeSuccess = false;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const { error: finalizeError } = await supabase.rpc('bl_finalize_credits', {
+          p_user_id: job.data.userId,
+          p_job_id: jobId,
+          p_final_cost: creditsToCharge,
+        });
+        
+        if (!finalizeError) {
+          console.log(`[Worker] 💰 Finalized ${creditsToCharge} credit(s) for job ${jobId}`);
+          finalizeSuccess = true;
+          break;
+        }
+        
+        console.warn(`[Worker] ⚠️ Credit finalization attempt ${attempt}/${maxRetries} failed:`, finalizeError.message);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * attempt)); // Exponential backoff
+        }
+      }
+      
+      if (!finalizeSuccess) {
+        console.error(`[Worker] ❌ Failed to finalize credits after ${maxRetries} attempts for job ${jobId}`);
       }
     }
 
@@ -1235,7 +1257,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
     }
     console.log(`${'═'.repeat(60)}\n`);
 
-    await supabase
+    const { error: failUpdateError } = await supabase
       .from("bl_jobs")
       .update({
         status: "failed",
@@ -1243,6 +1265,9 @@ async function processJob(job: Job<JobData>): Promise<void> {
         completed_at: new Date().toISOString(),
       })
       .eq("id", jobId);
+    if (failUpdateError) {
+      console.error(`[Worker] ❌ Failed to update job failure status:`, failUpdateError.message);
+    }
 
     // Release reserved credits on failure (refund to user)
     if (job.data.userId) {
