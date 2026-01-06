@@ -81,11 +81,15 @@ export default function CreditsPage() {
         ph.trackCreditPurchase({ packId, packName, price, credits, orderId: searchParams.get("session_id") || undefined });
         logCredits("📊 Purchase tracked (Meta, GA, PostHog)", { packId, price, credits });
       }
+      // Clear URL params to prevent toast on refresh
+      window.history.replaceState({}, '', '/app/credits');
     }
     if (canceled) {
       toastShownRef.current = true;
       logCredits("⚠️ Payment canceled detected");
       toast.warning("Payment was canceled.");
+      // Clear the URL params to prevent toast on refresh
+      window.history.replaceState({}, '', '/app/credits');
     }
   }, [success, canceled, toast, searchParams]);
 
@@ -104,16 +108,16 @@ export default function CreditsPage() {
       }
       logCredits("👤 User:", user.id);
 
-      // Get credit balance
-      const { data: balance } = await supabase.rpc("get_credit_balance", {
+      // Get credit balance (use bl_get_credit_balance for BlankLogo)
+      const { data: balance } = await supabase.rpc("bl_get_credit_balance", {
         p_user_id: user.id,
       });
       setCredits(balance ?? 0);
       logCredits("💰 Credit balance:", balance);
 
-      // Get subscription status
+      // Get subscription status (try bl_profiles first)
       const { data: profile } = await supabase
-        .from("profiles")
+        .from("bl_profiles")
         .select("subscription_tier")
         .eq("id", user.id)
         .maybeSingle();
