@@ -16,7 +16,7 @@ export function AnimatedCredits({ initialCredits }: AnimatedCreditsProps) {
   const [changeAmount, setChangeAmount] = useState(0);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Poll for credit changes every 3 seconds
+  // Poll for credit changes every 30 seconds (reduced from 3s to avoid excessive requests)
   useEffect(() => {
     const fetchCredits = async () => {
       try {
@@ -48,15 +48,15 @@ export function AnimatedCredits({ initialCredits }: AnimatedCreditsProps) {
     // Initial fetch
     fetchCredits();
 
-    // Poll every 3 seconds
-    pollIntervalRef.current = setInterval(fetchCredits, 3000);
+    // Poll every 30 seconds (was 3s - reduced to avoid excessive requests)
+    pollIntervalRef.current = setInterval(fetchCredits, 30000);
 
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [credits, initialCredits]);
+  }, [initialCredits]); // Removed 'credits' from deps to prevent re-creating interval on every update
 
   return (
     <Link 
