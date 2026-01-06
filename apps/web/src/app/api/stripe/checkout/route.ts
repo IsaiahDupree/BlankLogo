@@ -35,9 +35,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid price ID" }, { status: 400 });
   }
 
-  // Force payment mode for all prices (subscription prices are currently one-time)
-  // TODO: Change to subscription mode once recurring prices are created in Stripe Dashboard
-  const checkoutMode = "payment" as const;
+  // Determine mode based on whether it's a subscription or one-time purchase
+  const isSubscription = ["starter", "pro", "business"].some(
+    (tier) => STRIPE_PRICE_IDS[tier as keyof typeof STRIPE_PRICE_IDS] === priceId
+  );
+  const checkoutMode = isSubscription ? "subscription" : "payment";
 
   try {
     // Check if user has a Stripe customer ID (try bl_profiles first, then profiles)
@@ -109,6 +111,13 @@ export async function POST(request: Request) {
       metadata: {
         user_id: user.id,
       },
+      ...(checkoutMode === "subscription" && {
+        subscription_data: {
+          metadata: {
+            user_id: user.id,
+          },
+        },
+      }),
     });
 
     console.log("[STRIPE CHECKOUT] ✅ Session created:", session.id, "URL:", session.url);
