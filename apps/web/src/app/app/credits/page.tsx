@@ -187,15 +187,22 @@ export default function CreditsPage() {
   }
 
   async function handleManageSubscription() {
+    console.log("[Credits] 🔧 Manage Subscription clicked");
     try {
+      console.log("[Credits] 📤 Fetching portal URL...");
       const res = await fetch("/api/stripe/portal", { method: "POST" });
+      console.log("[Credits] 📥 Response status:", res.status);
       const data = await res.json();
+      console.log("[Credits] 📦 Response data:", data);
 
       if (data.url) {
+        console.log("[Credits] ✅ Redirecting to portal:", data.url);
         window.location.href = data.url;
+      } else {
+        console.log("[Credits] ❌ No URL in response");
       }
     } catch (err) {
-      console.error("Portal failed:", err);
+      console.error("[Credits] ❌ Portal failed:", err);
     }
   }
 
