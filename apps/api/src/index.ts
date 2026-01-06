@@ -1189,6 +1189,24 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       .from('bl_videos')
       .getPublicUrl(storagePath);
 
+    const userId = req.user?.id;
+    const processingMode = (processing_mode as ProcessingMode) || 'crop';
+    const creditsRequired = processingMode === 'inpaint' ? 2 : 1;
+
+    // Check credit balance if user is authenticated
+    if (userId) {
+      const { data: balance } = await supabase.rpc('bl_get_credit_balance', { p_user_id: userId });
+      console.log(`[API] 💰 User credit balance: ${balance}`);
+      
+      if ((balance || 0) < creditsRequired) {
+        return res.status(402).json({ 
+          error: 'Insufficient credits',
+          credits_required: creditsRequired,
+          credits_available: balance || 0,
+        });
+      }
+    }
+
     const jobData: JobData = {
       jobId,
       inputUrl: urlData.publicUrl,
@@ -1196,8 +1214,9 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       cropPixels: parseInt(crop_pixels) || preset.cropPixels,
       cropPosition: crop_position || preset.cropPosition,
       platform,
-      processingMode: (processing_mode as ProcessingMode) || 'crop',
+      processingMode,
       webhookUrl: webhook_url,
+      userId,
     };
 
     // Add to queue
@@ -1214,9 +1233,10 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       },
     });
 
-    // Store job in database
+    // Store job in database with user_id and credits
     await supabase.from('bl_jobs').insert({
       id: jobId,
+      user_id: userId,
       status: 'queued',
       input_url: urlData.publicUrl,
       input_filename: filename,
@@ -1225,7 +1245,22 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       crop_position: jobData.cropPosition,
       platform,
       webhook_url: webhook_url,
+      credits_required: creditsRequired,
     });
+
+    // Reserve credits for this job
+    if (userId) {
+      const { error: reserveError } = await supabase.rpc('bl_reserve_credits', {
+        p_user_id: userId,
+        p_job_id: jobId,
+        p_amount: creditsRequired,
+      });
+      if (reserveError) {
+        console.warn('[API] ⚠️ Could not reserve credits:', reserveError.message);
+      } else {
+        console.log(`[API] 💰 Reserved ${creditsRequired} credit(s) for job ${jobId}`);
+      }
+    }
 
     res.status(201).json({
       job_id: jobId,
