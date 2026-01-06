@@ -31,6 +31,22 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
+  # Python Inpainting Service (YOLO + LAMA watermark removal)
+  - type: web
+    name: blanklogo-inpaint
+    runtime: python
+    plan: starter
+    region: oregon
+    rootDir: apps/worker/python
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "python server.py"
+    healthCheckPath: /health
+    envVars:
+      - key: INPAINT_PORT
+        value: 8081
+      - key: PRELOAD_MODELS
+        value: "false"
+
   # Background Worker
   - type: worker
     name: blanklogo-worker
@@ -53,6 +69,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      - key: INPAINT_SERVICE_URL
+        sync: false
+        # Set manually after deploy: https://blanklogo-inpaint.onrender.com
 
   # Web App deployed to Vercel (not Render)
   # See: https://vercel.com/isaiahduprees-projects/blanklogo-web
