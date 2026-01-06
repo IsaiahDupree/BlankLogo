@@ -13,9 +13,14 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 let redis: Redis | null = null;
 try {
   redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 3, lazyConnect: true });
-  redis.on('error', () => {});
-} catch {
-  console.log('[Cache] Redis not available');
+  redis.on('error', (err) => {
+    console.warn('[Cache] Redis error:', err.message);
+  });
+  redis.on('connect', () => {
+    console.log('[Cache] Redis connected');
+  });
+} catch (err) {
+  console.warn('[Cache] Redis not available:', err instanceof Error ? err.message : 'Unknown error');
 }
 
 interface AuthenticatedRequest extends Request {

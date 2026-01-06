@@ -1167,8 +1167,9 @@ async function processJob(job: Job<JobData>): Promise<void> {
       .eq("id", jobId);
 
     // Finalize credits for this job (convert reserved to charged)
+    // Charge based on ACTUAL method used, not requested mode
     if (job.data.userId) {
-      const creditsToCharge = job.data.processingMode === 'inpaint' ? 2 : 1;
+      const creditsToCharge = processResult.mode === 'inpaint' ? 2 : 1;
       const { error: finalizeError } = await supabase.rpc('bl_finalize_credits', {
         p_user_id: job.data.userId,
         p_job_id: jobId,

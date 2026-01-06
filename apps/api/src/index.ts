@@ -965,6 +965,62 @@ function calculateCreditsRequired(processingMode: ProcessingMode): number {
   return processingMode === 'inpaint' ? 2 : 1;
 }
 
+// Helper: Get user's credit balance
+async function getUserCreditBalance(userId: string): Promise<{ balance: number; error?: string }> {
+  const { data: balance, error: blError } = await supabase.rpc('bl_get_credit_balance', {
+    p_user_id: userId,
+  });
+  
+  if (!blError) {
+    return { balance: balance || 0 };
+  }
+  
+  // Fallback to original function
+  const { data: origBalance, error: origError } = await supabase.rpc('get_credit_balance', {
+    p_user_id: userId,
+  });
+  
+  if (!origError) {
+    return { balance: origBalance || 0 };
+  }
+  
+  console.error('[API] ❌ Could not check credit balance');
+  console.error('[API] bl_get_credit_balance error:', blError.message);
+  console.error('[API] get_credit_balance error:', origError.message);
+  return { balance: 0, error: 'Credit system unavailable' };
+}
+
+// Helper: Reserve credits for a job
+async function reserveCredits(userId: string, jobId: string, amount: number): Promise<boolean> {
+  const { error: blError } = await supabase.rpc('bl_reserve_credits', {
+    p_user_id: userId,
+    p_job_id: jobId,
+    p_amount: amount,
+  });
+  
+  if (!blError) {
+    console.log(`[API] 💰 Reserved ${amount} credit(s) for job ${jobId}`);
+    return true;
+  }
+  
+  // Fallback to original function
+  const { error: origError } = await supabase.rpc('reserve_credits', {
+    p_user_id: userId,
+    p_job_id: jobId,
+    p_amount: amount,
+  });
+  
+  if (!origError) {
+    console.log(`[API] 💰 Reserved ${amount} credit(s) for job ${jobId} (fallback)`);
+    return true;
+  }
+  
+  console.warn('[API] ⚠️ Could not reserve credits');
+  console.warn('[API] bl_reserve_credits error:', blError.message);
+  console.warn('[API] reserve_credits error:', origError.message);
+  return false;
+}
+
 // Create a new watermark removal job (requires authentication)
 app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: AuthenticatedRequest, res) => {
   try {
@@ -1003,35 +1059,14 @@ app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: Authent
     // Calculate credits required
     const creditsRequired = calculateCreditsRequired(processing_mode as ProcessingMode);
 
-    // Check user's credit balance - try new function first, fall back to old one
-    let currentBalance = 0;
-    let balanceError = null;
+    // Check user's credit balance using helper
+    const { balance: currentBalance, error: balanceError } = await getUserCreditBalance(userId);
     
-    // Try new bl_get_credit_balance first
-    const { data: blBalanceData, error: blError } = await supabase.rpc('bl_get_credit_balance', {
-      p_user_id: userId,
-    });
-    
-    if (!blError) {
-      currentBalance = blBalanceData || 0;
-    } else {
-      // Fall back to original get_credit_balance function
-      const { data: origBalanceData, error: origError } = await supabase.rpc('get_credit_balance', {
-        p_user_id: userId,
+    if (balanceError) {
+      return res.status(503).json({ 
+        error: 'Credit system unavailable',
+        message: 'Unable to verify credit balance. Please try again later.'
       });
-      
-      if (!origError) {
-        currentBalance = origBalanceData || 0;
-      } else {
-        // If both fail, reject the request - don't allow bypassing credit check
-        console.error('[API] ❌ Could not check credit balance');
-        console.error('[API] bl_get_credit_balance error:', blError.message);
-        console.error('[API] get_credit_balance error:', origError.message);
-        return res.status(503).json({ 
-          error: 'Credit system unavailable',
-          message: 'Unable to verify credit balance. Please try again later.'
-        });
-      }
     }
     
     console.log(`[API] 💰 User credit balance: ${currentBalance}`);
@@ -1091,32 +1126,8 @@ app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: Authent
     
     console.log(`[API] ✅ Job ${jobId} inserted into database`);
 
-    // Reserve credits for this job - try new function, fall back to old, or skip
-    const { error: blReserveError } = await supabase.rpc('bl_reserve_credits', {
-      p_user_id: userId,
-      p_job_id: jobId,
-      p_amount: creditsRequired,
-    });
-
-    if (blReserveError) {
-      // Try original reserve_credits function
-      const { error: origReserveError } = await supabase.rpc('reserve_credits', {
-        p_user_id: userId,
-        p_job_id: jobId,
-        p_amount: creditsRequired,
-      });
-      
-      if (origReserveError) {
-        // If both fail, log warning but continue (graceful degradation)
-        console.warn('[API] ⚠️ Could not reserve credits, proceeding without credit reservation');
-        console.warn('[API] bl_reserve_credits error:', blReserveError.message);
-        console.warn('[API] reserve_credits error:', origReserveError.message);
-      } else {
-        console.log(`[API] 💰 Reserved ${creditsRequired} credit(s) for job ${jobId} (using original function)`);
-      }
-    } else {
-      console.log(`[API] 💰 Reserved ${creditsRequired} credit(s) for job ${jobId}`);
-    }
+    // Reserve credits for this job using helper
+    await reserveCredits(userId, jobId, creditsRequired);
 
     // Add to queue
     if (!jobQueue) {
@@ -1194,18 +1205,25 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
 
     const userId = req.user?.id;
     const processingMode = (processing_mode as ProcessingMode) || 'crop';
-    const creditsRequired = processingMode === 'inpaint' ? 2 : 1;
+    const creditsRequired = calculateCreditsRequired(processingMode);
 
     // Check credit balance if user is authenticated
     if (userId) {
-      const { data: balance } = await supabase.rpc('bl_get_credit_balance', { p_user_id: userId });
+      const { balance, error: balanceError } = await getUserCreditBalance(userId);
       console.log(`[API] 💰 User credit balance: ${balance}`);
       
-      if ((balance || 0) < creditsRequired) {
+      if (balanceError) {
+        return res.status(503).json({ 
+          error: 'Credit system unavailable',
+          message: 'Unable to verify credit balance. Please try again later.'
+        });
+      }
+      
+      if (balance < creditsRequired) {
         return res.status(402).json({ 
           error: 'Insufficient credits',
           credits_required: creditsRequired,
-          credits_available: balance || 0,
+          credits_available: balance,
         });
       }
     }
@@ -1251,18 +1269,9 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       credits_required: creditsRequired,
     });
 
-    // Reserve credits for this job
+    // Reserve credits for this job using helper
     if (userId) {
-      const { error: reserveError } = await supabase.rpc('bl_reserve_credits', {
-        p_user_id: userId,
-        p_job_id: jobId,
-        p_amount: creditsRequired,
-      });
-      if (reserveError) {
-        console.warn('[API] ⚠️ Could not reserve credits:', reserveError.message);
-      } else {
-        console.log(`[API] 💰 Reserved ${creditsRequired} credit(s) for job ${jobId}`);
-      }
+      await reserveCredits(userId, jobId, creditsRequired);
     }
 
     res.status(201).json({
