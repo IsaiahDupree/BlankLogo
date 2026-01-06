@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { CreditCard, Check, Loader2, ExternalLink, Zap, Crown, Rocket } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -45,12 +45,16 @@ export default function CreditsPage() {
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null);
   const searchParams = useSearchParams();
+  const toastShownRef = useRef(false);
 
   const success = searchParams.get("success");
   const canceled = searchParams.get("canceled");
   const toast = useToast();
 
   useEffect(() => {
+    // Prevent showing toast multiple times
+    if (toastShownRef.current) return;
+    
     logCredits("💳 Credits page loaded");
     
     // Track page view for pricing
@@ -60,6 +64,7 @@ export default function CreditsPage() {
     });
     
     if (success) {
+      toastShownRef.current = true;
       logCredits("✅ Payment success detected");
       toast.success("Payment successful! Credits added to your account.");
       
@@ -78,6 +83,7 @@ export default function CreditsPage() {
       }
     }
     if (canceled) {
+      toastShownRef.current = true;
       logCredits("⚠️ Payment canceled detected");
       toast.warning("Payment was canceled.");
     }
