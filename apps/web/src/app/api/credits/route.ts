@@ -10,6 +10,16 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Try bl_get_credit_balance first (BlankLogo), fallback to get_credit_balance
+    const { data: blCredits, error: blError } = await supabase.rpc("bl_get_credit_balance", { 
+      p_user_id: user.id 
+    });
+    
+    if (!blError && blCredits !== null) {
+      return NextResponse.json({ credits: blCredits });
+    }
+
+    // Fallback to original function
     const { data: credits } = await supabase.rpc("get_credit_balance", { 
       p_user_id: user.id 
     });
