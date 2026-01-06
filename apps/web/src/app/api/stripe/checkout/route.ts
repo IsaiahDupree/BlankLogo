@@ -82,12 +82,16 @@ export async function POST(request: Request) {
     }
 
     // Create checkout session
+    // Use APP_BASE_URL or fallback to NEXT_PUBLIC_APP_URL or default
+    const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://www.blanklogo.app";
+    
     console.log("[STRIPE CHECKOUT] 🔧 Creating session with:", {
       customerId,
       checkoutMode,
       priceId,
-      successUrl: `${process.env.APP_BASE_URL}/app/credits?success=true`,
-      cancelUrl: `${process.env.APP_BASE_URL}/app/credits?canceled=true`,
+      baseUrl,
+      successUrl: `${baseUrl}/app/credits?success=true`,
+      cancelUrl: `${baseUrl}/app/credits?canceled=true`,
     });
 
     const session = await stripe.checkout.sessions.create({
@@ -100,8 +104,8 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.APP_BASE_URL}/app/credits?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.APP_BASE_URL}/app/credits?canceled=true`,
+      success_url: `${baseUrl}/app/credits?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/app/credits?canceled=true`,
       metadata: {
         user_id: user.id,
       },
