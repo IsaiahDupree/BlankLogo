@@ -32,10 +32,11 @@ export const STRIPE_PRICE_IDS = {
   pack_25: process.env.STRIPE_PRICE_PACK_25 ?? "price_1SmNRJBF0wJEbOgNJMtcHI66",   // $19 - 25 credits
   pack_50: process.env.STRIPE_PRICE_PACK_50 ?? "price_1SmNRKBF0wJEbOgNXPoLYo55",   // $35 - 50 credits
   pack_100: process.env.STRIPE_PRICE_PACK_100 ?? "price_1SmNRKBF0wJEbOgNh7aVkcdg", // $59 - 100 credits
-  // Monthly subscription tiers (BlankLogo)
-  starter: process.env.STRIPE_PRICE_STARTER ?? "price_1SmRlHBF0wJEbOgNks51oZfc",   // $9/mo - 10 credits
-  pro: process.env.STRIPE_PRICE_PRO ?? "price_1SmRlIBF0wJEbOgNNF7QZiIz",           // $29/mo - 50 credits
-  business: process.env.STRIPE_PRICE_BUSINESS ?? "price_1SmRlJBF0wJEbOgNs6OlXhlJ", // $79/mo - 200 credits
+  // Monthly subscription tiers - DISABLED until recurring prices are created in Stripe Dashboard
+  // These prices don't exist in production yet - need to create recurring prices manually
+  starter: process.env.STRIPE_PRICE_STARTER ?? "",   // TODO: Create in Stripe Dashboard
+  pro: process.env.STRIPE_PRICE_PRO ?? "",           // TODO: Create in Stripe Dashboard  
+  business: process.env.STRIPE_PRICE_BUSINESS ?? "", // TODO: Create in Stripe Dashboard
 } as const;
 
 // Map credits to pack IDs (one-time purchases)

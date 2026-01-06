@@ -260,8 +260,8 @@ export default function CreditsPage() {
         </div>
       </div>
 
-      {/* Subscription Plans */}
-      <div className="mb-8">
+      {/* Subscription Plans - HIDDEN until recurring prices are created in Stripe */}
+      {false && (<div className="mb-8">
         <h2 className="text-xl font-bold mb-4">Monthly Plans</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {PRICING_TIERS.map((tier) => {
@@ -324,7 +324,7 @@ export default function CreditsPage() {
             );
           })}
         </div>
-      </div>
+      </div>)}
 
       {/* Credit Packs */}
       <div>
