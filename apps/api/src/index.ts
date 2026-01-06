@@ -1023,12 +1023,14 @@ app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: Authent
       if (!origError) {
         currentBalance = origBalanceData || 0;
       } else {
-        // If both fail, log warning but allow job creation (credits will be handled later)
-        console.warn('[API] ⚠️ Could not check credit balance, proceeding without credit check');
-        console.warn('[API] bl_get_credit_balance error:', blError.message);
-        console.warn('[API] get_credit_balance error:', origError.message);
-        // Set a high balance to allow the job to proceed
-        currentBalance = 999;
+        // If both fail, reject the request - don't allow bypassing credit check
+        console.error('[API] ❌ Could not check credit balance');
+        console.error('[API] bl_get_credit_balance error:', blError.message);
+        console.error('[API] get_credit_balance error:', origError.message);
+        return res.status(503).json({ 
+          error: 'Credit system unavailable',
+          message: 'Unable to verify credit balance. Please try again later.'
+        });
       }
     }
     
@@ -1066,7 +1068,7 @@ app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: Authent
     
     console.log(`[API] 📦 Job data:`, JSON.stringify(jobData, null, 2));
 
-    // Store job in database first (credits_required column may not exist yet)
+    // Store job in database first
     const { error: insertError } = await supabase.from('bl_jobs').insert({
       id: jobId,
       user_id: userId,
@@ -1078,6 +1080,7 @@ app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: Authent
       platform,
       webhook_url: webhook_url,
       metadata,
+      credits_required: creditsRequired,
     });
 
     if (insertError) {

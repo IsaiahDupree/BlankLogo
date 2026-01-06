@@ -1243,6 +1243,19 @@ async function processJob(job: Job<JobData>): Promise<void> {
       })
       .eq("id", jobId);
 
+    // Release reserved credits on failure (refund to user)
+    if (job.data.userId) {
+      const { error: releaseError } = await supabase.rpc('bl_release_credits', {
+        p_user_id: job.data.userId,
+        p_job_id: jobId,
+      });
+      if (releaseError) {
+        console.error(`[Worker] ⚠️ Error releasing credits:`, releaseError.message);
+      } else {
+        console.log(`[Worker] 💰 Credits refunded for failed job ${jobId}`);
+      }
+    }
+
     if (webhookUrl) {
       await sendWebhook(webhookUrl, {
         job_id: jobId,
