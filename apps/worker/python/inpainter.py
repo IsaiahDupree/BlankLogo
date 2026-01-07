@@ -25,23 +25,23 @@ def get_device() -> str:
 
 
 def get_lama_model():
-    """Lazy-load LAMA model via IOPaint."""
+    """Lazy-load LAMA model via simple-lama-inpainting."""
     global _lama_model
     if _lama_model is None:
         try:
-            from iopaint.model_manager import ModelManager
-            from iopaint.schema import InpaintRequest
+            from simple_lama_inpainting import SimpleLama
             
-            device = get_device()
+            # Force CPU - the pretrained model is CUDA-compiled JIT
+            device = "cpu"
             logger.info(f"Loading LAMA model on {device}")
             
             _lama_model = {
-                "manager": ModelManager(name="lama", device=device),
-                "request": InpaintRequest()
+                "model": SimpleLama(device=device),
+                "device": device
             }
             logger.info("LAMA model loaded")
-        except ImportError:
-            logger.warning("IOPaint not available, using fallback inpainting")
+        except Exception as e:
+            logger.warning(f"simple-lama-inpainting failed ({e}), using fallback inpainting")
             _lama_model = {"fallback": True}
     
     return _lama_model
@@ -103,18 +103,19 @@ class WatermarkInpainter:
             return self._fallback_inpaint(frame, mask)
         
         import cv2
+        from PIL import Image
         
-        # IOPaint expects RGB
+        # simple-lama-inpainting expects PIL Images
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img_pil = Image.fromarray(frame_rgb)
+        mask_pil = Image.fromarray(mask)
         
-        result = self.model["manager"](
-            frame_rgb, 
-            mask, 
-            self.model["request"]
-        )
+        # Run inpainting
+        result_pil = self.model["model"](img_pil, mask_pil)
         
-        # Convert back to BGR
-        result_bgr = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+        # Convert back to numpy BGR
+        result_rgb = np.array(result_pil)
+        result_bgr = cv2.cvtColor(result_rgb, cv2.COLOR_RGB2BGR)
         return result_bgr
     
     def _fallback_inpaint(

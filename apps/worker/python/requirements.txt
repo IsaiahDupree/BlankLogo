@@ -1,18 +1,23 @@
 # BlankLogo Watermark Inpainting Service
 # Python dependencies for quality mode
 
+# Core - pin Pillow first to avoid build issues
+Pillow>=10.0.0
+
 # Core
 numpy>=1.24.0
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
+
+# PyTorch - use CPU-only for Render (no GPU)
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.0.0
 torchvision>=0.15.0
 
 # YOLO Detection
 ultralytics>=8.0.0
 
-# Inpainting (IOPaint/LAMA)
-# Using iopaint for LAMA model
-iopaint>=1.2.0
+# Inpainting - use simple-lama-inpainting instead of iopaint (lighter)
+simple-lama-inpainting>=0.1.0
 
 # Video processing
 ffmpeg-python>=0.2.0
