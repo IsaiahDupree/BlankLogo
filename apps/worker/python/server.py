@@ -273,5 +273,6 @@ async def startup():
 if __name__ == "__main__":
     import uvicorn
     
-    port = int(os.environ.get("INPAINT_PORT", 8081))
+    # Render uses PORT env var, fallback to INPAINT_PORT or 8081
+    port = int(os.environ.get("PORT", os.environ.get("INPAINT_PORT", 8081)))
     uvicorn.run(app, host="0.0.0.0", port=port)
