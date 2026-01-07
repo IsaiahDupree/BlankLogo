@@ -28,11 +28,16 @@ interface JobDetail {
   input_url: string | null;
   output_url: string | null;
   created_at: string;
+  started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
   progress: number;
+  current_step: string | null;
+  processing_time_ms: number | null;
   mode: string;
   crop_pixels: number | null;
+  input_size_bytes: number | null;
+  input_duration_sec: number | null;
 }
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
@@ -278,19 +283,52 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         </div>
       ) : job.status === "failed" ? (
         /* Failed State */
-        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-8 text-center">
-          <XCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
-          <h3 className="text-xl font-semibold text-red-400 mb-2">Processing Failed</h3>
-          <p className="text-gray-400 mb-4">
-            {job.error_message || "An error occurred while processing your video"}
-          </p>
-          <Link
-            href="/app/remove"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Try Again
-          </Link>
+        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-8">
+          <div className="text-center mb-6">
+            <XCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
+            <h3 className="text-xl font-semibold text-red-400 mb-2">Processing Failed</h3>
+            <p className="text-gray-400">
+              {job.error_message || "An error occurred while processing your video"}
+            </p>
+          </div>
+          
+          {/* Failed job details */}
+          <div className="bg-black/20 rounded-xl p-4 mb-6 space-y-3">
+            {job.input_filename && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Input File</span>
+                <span className="text-gray-300">{job.input_filename}</span>
+              </div>
+            )}
+            {job.current_step && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Failed At Step</span>
+                <span className="text-red-400">{job.current_step}</span>
+              </div>
+            )}
+            {job.processing_time_ms && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Processing Time</span>
+                <span className="text-gray-300">{(job.processing_time_ms / 1000).toFixed(1)}s</span>
+              </div>
+            )}
+            {job.input_size_bytes && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">File Size</span>
+                <span className="text-gray-300">{(job.input_size_bytes / 1024 / 1024).toFixed(2)} MB</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="text-center">
+            <Link
+              href="/app/remove"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Try Again
+            </Link>
+          </div>
         </div>
       ) : (
         /* Processing State */
@@ -299,21 +337,41 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
           </div>
           <h3 className="text-xl font-semibold text-indigo-400 mb-2">Processing Your Video</h3>
+          
+          {/* Current step indicator */}
+          {job.current_step && (
+            <p className="text-indigo-300 font-medium mb-2">
+              {job.current_step}
+            </p>
+          )}
+          
           <p className="text-gray-400 mb-4">
             This usually takes 30-60 seconds. The page will update automatically.
           </p>
-          {job.progress > 0 && (
-            <div className="max-w-md mx-auto">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-gray-400">Progress</span>
-                <span className="text-indigo-400 font-mono">{job.progress}%</span>
-              </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                  style={{ width: `${job.progress}%` }}
-                />
-              </div>
+          
+          {/* Progress bar */}
+          <div className="max-w-md mx-auto">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-400">{job.input_filename || "Processing"}</span>
+              <span className="text-indigo-400 font-mono">{job.progress || 0}%</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                style={{ width: `${job.progress || 0}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Input file info */}
+          {job.input_filename && (
+            <div className="mt-4 text-sm text-gray-500">
+              {job.input_size_bytes && (
+                <span>{(job.input_size_bytes / 1024 / 1024).toFixed(2)} MB</span>
+              )}
+              {job.input_duration_sec && (
+                <span className="ml-3">{Math.round(job.input_duration_sec)}s duration</span>
+              )}
             </div>
           )}
         </div>

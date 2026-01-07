@@ -1065,16 +1065,26 @@ async function processJob(job: Job<JobData>): Promise<void> {
     if (error) console.error(`[Worker] ❌ Failed to update progress:`, error.message);
   };
 
-  // Update status to processing
+  // Update status to processing and save input info immediately
+  // This ensures input info is preserved even if job fails later
   console.log(`[Worker] 📊 Step 1/6: Updating job status to 'processing'...`);
   const { error: statusError } = await supabase
     .from("bl_jobs")
-    .update({ status: "processing", started_at: new Date().toISOString(), progress: 5, current_step: "Starting" })
+    .update({ 
+      status: "processing", 
+      started_at: new Date().toISOString(), 
+      progress: 5, 
+      current_step: "Starting",
+      // Save input info immediately so it's preserved even if job fails
+      input_filename: inputFilename,
+      input_url: inputUrl,
+    })
     .eq("id", jobId);
   if (statusError) {
     console.error(`[Worker] ❌ Failed to update status to processing:`, statusError.message);
   } else {
     console.log(`[Worker] ✅ Status updated to 'processing'`);
+    console.log(`[Worker] ✅ Input info saved: ${inputFilename}`);
   }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `blanklogo-${jobId}-`));
@@ -1257,16 +1267,21 @@ async function processJob(job: Job<JobData>): Promise<void> {
     }
     console.log(`${'═'.repeat(60)}\n`);
 
+    const processingTime = Date.now() - startTime;
     const { error: failUpdateError } = await supabase
       .from("bl_jobs")
       .update({
         status: "failed",
         error_message: errorMessage,
         completed_at: new Date().toISOString(),
+        processing_time_ms: processingTime,
+        // Keep current_step so users can see where it failed
       })
       .eq("id", jobId);
     if (failUpdateError) {
       console.error(`[Worker] ❌ Failed to update job failure status:`, failUpdateError.message);
+    } else {
+      console.log(`[Worker] ✅ Job marked as failed after ${(processingTime / 1000).toFixed(1)}s`);
     }
 
     // Release reserved credits on failure (refund to user)
