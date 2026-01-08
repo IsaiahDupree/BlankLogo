@@ -53,6 +53,27 @@ async def health_check():
     return {"status": "healthy", "service": "blanklogo-inpainter"}
 
 
+@app.get("/capabilities")
+async def get_capabilities():
+    """Return service capabilities and supported formats."""
+    return {
+        "service": "blanklogo-inpainter",
+        "version": "1.0.0",
+        "capabilities": {
+            "modes": ["crop", "inpaint", "auto"],
+            "crop_positions": ["top", "bottom", "left", "right"],
+            "supported_formats": ["mp4", "mov", "webm", "avi"],
+            "max_file_size_mb": 500,
+            "max_duration_sec": 300,
+        },
+        "features": {
+            "async_processing": True,
+            "progress_tracking": True,
+            "gpu_acceleration": False,  # Render free tier doesn't have GPU
+        }
+    }
+
+
 @app.post("/process")
 async def process_video(
     background_tasks: BackgroundTasks,
