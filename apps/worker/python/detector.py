@@ -60,9 +60,35 @@ def get_yolo_model():
 class WatermarkDetector:
     """Detects watermarks in video frames using YOLO."""
     
-    def __init__(self, confidence_threshold: float = 0.5):
+    def __init__(self, confidence_threshold: float = 0.25):  # Lowered from 0.5 for better detection
         self.model = get_yolo_model()
         self.confidence_threshold = confidence_threshold
+        
+        # Known watermark positions for fallback detection
+        self.KNOWN_POSITIONS = {
+            "sora": {"position": "bottom_left", "width_pct": 0.25, "height_pct": 0.08},
+            "tiktok": {"position": "bottom_right", "width_pct": 0.15, "height_pct": 0.05},
+            "runway": {"position": "bottom_right", "width_pct": 0.12, "height_pct": 0.04},
+            "pika": {"position": "bottom_left", "width_pct": 0.15, "height_pct": 0.05},
+        }
+    
+    def get_fallback_bbox(self, frame_shape: tuple, platform: str = "sora") -> tuple:
+        """Get fallback bbox for known watermark positions when YOLO fails."""
+        h, w = frame_shape[:2]
+        
+        config = self.KNOWN_POSITIONS.get(platform, self.KNOWN_POSITIONS["sora"])
+        
+        wm_w = int(w * config["width_pct"])
+        wm_h = int(h * config["height_pct"])
+        
+        if config["position"] == "bottom_left":
+            return (10, h - wm_h - 10, wm_w + 10, h - 10)
+        elif config["position"] == "bottom_right":
+            return (w - wm_w - 10, h - wm_h - 10, w - 10, h - 10)
+        elif config["position"] == "top_left":
+            return (10, 10, wm_w + 10, wm_h + 10)
+        else:  # top_right
+            return (w - wm_w - 10, 10, w - 10, wm_h + 10)
     
     def detect_frame(self, frame: np.ndarray) -> Dict[str, Any]:
         """
@@ -112,13 +138,20 @@ class WatermarkDetector:
             "center": (cx, cy)
         }
     
-    def detect_video(self, frames: List[np.ndarray]) -> List[Dict[str, Any]]:
+    def detect_video(
+        self, 
+        frames: List[np.ndarray], 
+        platform: str = "sora",
+        use_fallback: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         Detect watermarks in all frames of a video.
-        Fills in missed detections using interval averaging.
+        Uses fallback detection for known platforms when YOLO fails.
         
         Args:
             frames: List of BGR frames
+            platform: Platform name for fallback detection
+            use_fallback: Whether to use fallback bbox if no detections
             
         Returns:
             List of detection results, one per frame
@@ -140,9 +173,21 @@ class WatermarkDetector:
                 bbox_centers.append(None)
                 missed_indices.append(idx)
         
-        # Second pass: fill missed detections
+        # Second pass: fill missed detections with neighbor interpolation
         if missed_indices:
             results = self._fill_missed_detections(results, missed_indices)
+        
+        # Third pass: if still no detections, use fallback bbox for known platforms
+        detected_count = sum(1 for r in results if r["detected"])
+        if detected_count == 0 and use_fallback and frames:
+            logger.warning(f"YOLO detected 0 watermarks, using fallback bbox for platform: {platform}")
+            fallback_bbox = self.get_fallback_bbox(frames[0].shape, platform)
+            for result in results:
+                result["detected"] = True
+                result["bbox"] = fallback_bbox
+                result["fallback"] = True
+                result["confidence"] = 0.0
+            logger.info(f"Applied fallback bbox to all {len(results)} frames: {fallback_bbox}")
         
         return results
     
