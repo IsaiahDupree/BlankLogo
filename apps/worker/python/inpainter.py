@@ -58,7 +58,7 @@ class WatermarkInpainter:
         self, 
         frame_shape: tuple, 
         bbox: tuple,
-        padding: int = 5
+        padding: int = 15  # Increased from 5 for better coverage
     ) -> np.ndarray:
         """
         Create a binary mask from a bounding box.
