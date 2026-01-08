@@ -325,12 +325,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 );
 
-// Middleware - CORS configuration (allow all origins for now to fix "Failed to fetch")
+// CORS - allow all origins (fixed 2026-01-08)
 app.use(cors({
-  origin: true, // Allow all origins - can restrict later
-  credentials: true,
+  origin: '*',
+  credentials: false,
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200,
 }));
 app.use(express.json());
 
