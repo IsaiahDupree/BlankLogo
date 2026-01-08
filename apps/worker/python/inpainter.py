@@ -30,16 +30,23 @@ def get_lama_model():
     if _lama_model is None:
         try:
             from simple_lama_inpainting import SimpleLama
+            import torch
             
-            # Force CPU - the pretrained model is CUDA-compiled JIT
-            device = "cpu"
+            # Determine best device - MPS for Apple Silicon, CPU otherwise
+            if torch.backends.mps.is_available():
+                device = "mps"
+            else:
+                device = "cpu"
+            
             logger.info(f"Loading LAMA model on {device}")
             
-            _lama_model = {
-                "model": SimpleLama(device=device),
-                "device": device
-            }
-            logger.info("LAMA model loaded")
+            # SimpleLama needs to be loaded without CUDA tensors
+            with torch.device(device):
+                _lama_model = {
+                    "model": SimpleLama(device=device),
+                    "device": device
+                }
+            logger.info("LAMA model loaded successfully")
         except Exception as e:
             logger.warning(f"simple-lama-inpainting failed ({e}), using fallback inpainting")
             _lama_model = {"fallback": True}
@@ -124,13 +131,29 @@ class WatermarkInpainter:
         mask: np.ndarray
     ) -> np.ndarray:
         """
-        Fallback inpainting using OpenCV's built-in inpainting.
-        Not as good as LAMA but works without GPU.
+        Enhanced fallback inpainting using OpenCV.
+        Uses Navier-Stokes with larger radius and mask processing for better quality.
         """
         import cv2
         
-        # Use OpenCV's Telea inpainting algorithm
-        result = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
+        # Dilate mask for smoother edges (covers more of the watermark)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        mask_dilated = cv2.dilate(mask, kernel, iterations=2)
+        
+        # Use Navier-Stokes based inpainting (better for larger areas)
+        # Increase inpaint radius for smoother results
+        result = cv2.inpaint(frame, mask_dilated, 7, cv2.INPAINT_NS)
+        
+        # Optional: Apply slight Gaussian blur to blend edges
+        # Create a blurred version for edge blending
+        mask_blur = cv2.GaussianBlur(mask_dilated.astype(np.float32), (15, 15), 0)
+        mask_blur = (mask_blur / 255.0).astype(np.float32)
+        
+        # Blend inpainted region with slight blur for smoother transition
+        mask_3ch = np.stack([mask_blur] * 3, axis=-1)
+        blurred = cv2.GaussianBlur(result, (5, 5), 0)
+        result = (result * (1 - mask_3ch * 0.3) + blurred * (mask_3ch * 0.3)).astype(np.uint8)
+        
         return result
     
     def inpaint_video(
