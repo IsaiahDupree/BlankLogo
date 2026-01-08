@@ -70,7 +70,7 @@ declare global {
   }
 }
 
-// Initialize Meta Pixel
+// Initialize Meta Pixel with stub function (standard Facebook pattern)
 export function initMetaPixel(config: MetaPixelConfig): void {
   if (typeof window === 'undefined') return;
   
@@ -82,28 +82,47 @@ export function initMetaPixel(config: MetaPixelConfig): void {
   }
 
   // Check if already initialized
-  if (typeof window.fbq === 'function') {
+  if (window.fbq && typeof window.fbq === 'function' && (window.fbq as unknown as { loaded?: boolean }).loaded) {
     if (debug) console.log('[Meta Pixel] Already initialized');
     return;
   }
 
-  // Load the Meta Pixel script
+  // Create fbq stub function BEFORE loading script (standard Facebook pattern)
+  // This allows tracking calls to be queued before script loads
+  const fbq = function(...args: unknown[]) {
+    (fbq as unknown as { callMethod?: (...a: unknown[]) => void; queue: unknown[] }).callMethod
+      ? (fbq as unknown as { callMethod: (...a: unknown[]) => void }).callMethod(...args)
+      : (fbq as unknown as { queue: unknown[] }).queue.push(args);
+  };
+  
+  // Initialize queue
+  (fbq as unknown as { queue: unknown[]; loaded: boolean; version: string }).queue = [];
+  (fbq as unknown as { loaded: boolean }).loaded = false;
+  (fbq as unknown as { version: string }).version = '2.0';
+  
+  // Set on window
+  if (!window.fbq) {
+    window.fbq = fbq as typeof window.fbq;
+  }
+  window._fbq = window.fbq;
+
+  // Now safe to call fbq - it will queue the calls
+  window.fbq('init', pixelId);
+  
+  if (autoConfig) {
+    window.fbq('track', 'PageView');
+  }
+
+  if (debug) {
+    console.log('[Meta Pixel] Stub initialized with ID:', pixelId);
+  }
+
+  // Load the actual Meta Pixel script
   const script = document.createElement('script');
   script.async = true;
   script.src = 'https://connect.facebook.net/en_US/fbevents.js';
-  script.onload = () => {
-    // Initialize pixel after script loads
-    if (window.fbq) {
-      window.fbq('init', pixelId);
-      
-      if (autoConfig) {
-        window.fbq('track', 'PageView');
-      }
-
-      if (debug) {
-        console.log('[Meta Pixel] Initialized with ID:', pixelId);
-      }
-    }
+  script.onerror = () => {
+    if (debug) console.warn('[Meta Pixel] Failed to load script');
   };
   
   const firstScript = document.getElementsByTagName('script')[0];
