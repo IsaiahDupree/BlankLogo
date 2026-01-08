@@ -197,11 +197,20 @@ test.describe("Golden Path: Video Upload", () => {
         break;
       }
       
-      // Check for error
-      const errorEl = page.locator('text=/error|failed/i');
-      if (await errorEl.isVisible().catch(() => false)) {
-        const errorText = await errorEl.textContent().catch(() => "unknown error");
+      // Check for ACTUAL job error (not transient network issues)
+      // Look for error banner/message, not console logs
+      const jobErrorEl = page.locator('[class*="error"]:has-text("failed"), [class*="Error"]:has-text("failed"), .text-red-500:has-text("error")');
+      if (await jobErrorEl.isVisible().catch(() => false)) {
+        const errorText = await jobErrorEl.textContent().catch(() => "unknown error");
         console.log(`[Golden Path] Job failed: ${errorText}`);
+        failed = true;
+        break;
+      }
+      
+      // Check for retry button (indicates failure)
+      const retryBtn = page.locator('button:has-text("Retry"), button:has-text("Try Again")');
+      if (await retryBtn.isVisible().catch(() => false)) {
+        console.log("[Golden Path] Job failed - retry button visible");
         failed = true;
         break;
       }
