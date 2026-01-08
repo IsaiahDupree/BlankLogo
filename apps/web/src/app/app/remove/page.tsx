@@ -178,8 +178,12 @@ export default function RemoveWatermarkPage() {
         });
       }
     } catch (err) {
-      console.log("%c❌ Network error during poll", "color: red; font-weight: bold;");
-      logRemove("❌ Error polling job:", err);
+      // Don't show "Failed to fetch" as an error banner - it's a transient network issue
+      // Just log it and let the next poll retry
+      console.log("%c⚠️ Network hiccup during poll (will retry)", "color: orange; font-weight: bold;");
+      logRemove("⚠️ Poll network issue (retrying):", err instanceof Error ? err.message : err);
+      // Don't set error state for transient network issues during polling
+      // The next poll will retry automatically
     }
   }, [supabase, toast]);
 
