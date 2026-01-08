@@ -60,7 +60,7 @@ const PLATFORMS = [
 ];
 
 export default function RemoveWatermarkPage() {
-  const [mode, setMode] = useState<"url" | "upload">("url");
+  const [mode, setMode] = useState<"url" | "upload">("upload");
   const [videoUrl, setVideoUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [platform, setPlatform] = useState("auto");
