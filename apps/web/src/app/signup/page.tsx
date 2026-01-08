@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
-import { trackCompleteRegistration, trackLead } from "@/lib/meta-pixel";
+import { trackCompleteRegistration } from "@/lib/meta-pixel";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");

@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { event, test } = await request.json();
+  const { event } = await request.json();
 
   if (!event) {
     return NextResponse.json({ error: "Missing event type" }, { status: 400 });

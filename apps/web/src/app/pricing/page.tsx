@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, Zap, Crown, Rocket, CreditCard, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
-import { trackViewPricing, trackSelectCreditPack, trackStartCheckout } from "@/lib/meta-pixel";
+import { trackViewPricing, trackStartCheckout } from "@/lib/meta-pixel";
 
 // Stripe Price IDs (must match apps/web/src/lib/stripe.ts)
 const PRICE_IDS = {
