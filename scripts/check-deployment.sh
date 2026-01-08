@@ -16,7 +16,8 @@ NC='\033[0m' # No Color
 # Default URLs (can be overridden via environment variables)
 API_URL="${DEPLOY_API_URL:-${API_URL:-https://blanklogo-api.onrender.com}}"
 WEB_URL="${DEPLOY_WEB_URL:-${WEB_URL:-https://www.blanklogo.app}}"
-WORKER_URL="${DEPLOY_WORKER_URL:-${WORKER_URL:-}}"  # Worker may not have external URL
+INPAINT_URL="${DEPLOY_INPAINT_URL:-${INPAINT_URL:-https://blanklogo-inpaint.onrender.com}}"
+WORKER_URL="${DEPLOY_WORKER_URL:-${WORKER_URL:-}}"  # Worker is background process, no HTTP
 
 # Timeout for requests
 TIMEOUT=30
@@ -143,10 +144,11 @@ echo -e "${BLUE}╔════════════════════�
 echo -e "${BLUE}║          BlankLogo Deployment Health Check                        ║${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "  API URL:    $API_URL"
-echo "  Web URL:    $WEB_URL"
-echo "  Worker URL: ${WORKER_URL:-'(not configured)'}"
-echo "  Timestamp:  $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+echo "  API URL:     $API_URL"
+echo "  Web URL:     $WEB_URL"
+echo "  Inpaint URL: $INPAINT_URL"
+echo "  Worker URL:  ${WORKER_URL:-'(background worker)'}"
+echo "  Timestamp:   $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 # ─────────────────────────────────────────────────────────────────────
 # API Health Checks
@@ -181,19 +183,28 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────
-# Worker Health Checks (if URL provided)
+# Inpaint Service Health Checks
 # ─────────────────────────────────────────────────────────────────────
-if [ -n "$WORKER_URL" ]; then
-    print_header "Worker Service ($WORKER_URL)"
-    
-    check_endpoint "$WORKER_URL/health" "Health endpoint"
-    check_endpoint "$WORKER_URL/readyz" "Readiness probe"
-    
-    # Run full diagnostics
-    run_diagnostics "$WORKER_URL" "Worker"
+print_header "Inpaint Service ($INPAINT_URL)"
+
+check_endpoint "$INPAINT_URL/health" "Health endpoint"
+check_json_field "$INPAINT_URL/health" "Inpaint status" ".status" "healthy"
+
+# ─────────────────────────────────────────────────────────────────────
+# Worker Health Checks (background process - check via API queue stats)
+# ─────────────────────────────────────────────────────────────────────
+print_header "Worker Service (Background)"
+
+# Worker is a background process, check its status via queue stats
+QUEUE_STATS=$(curl -s --max-time $TIMEOUT "$API_URL/status" 2>/dev/null | jq -r '.services.queue.stats' 2>/dev/null)
+if [ -n "$QUEUE_STATS" ] && [ "$QUEUE_STATS" != "null" ]; then
+    WAITING=$(echo "$QUEUE_STATS" | jq -r '.waiting // 0')
+    ACTIVE=$(echo "$QUEUE_STATS" | jq -r '.active // 0')
+    COMPLETED=$(echo "$QUEUE_STATS" | jq -r '.completed // 0')
+    FAILED=$(echo "$QUEUE_STATS" | jq -r '.failed // 0')
+    print_result "pass" "Worker queue accessible" "waiting=$WAITING, active=$ACTIVE, completed=$COMPLETED, failed=$FAILED"
 else
-    print_header "Worker Service"
-    print_result "skip" "Worker health checks" "No WORKER_URL configured (background workers may not have external URLs)"
+    print_result "fail" "Worker queue" "Cannot read queue stats"
 fi
 
 # ─────────────────────────────────────────────────────────────────────
