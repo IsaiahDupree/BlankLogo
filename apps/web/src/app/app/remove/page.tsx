@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Download, Play, RotateCcw, Eye } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
+import { trackGenerateRequested, trackMediaReady, trackDownload } from "@/lib/meta-pixel";
 
 // Logging utility
 function logRemove(message: string, data?: unknown) {
@@ -103,9 +104,9 @@ export default function RemoveWatermarkPage() {
         const job = data.job || data;
         setJobStatus(job);
         
-        // Enhanced logging with step info
+        // Get progress and step from API response
         const progress = job.progress || 0;
-        const currentStepName = job.current_step || PROCESSING_STEPS[Math.min(Math.floor(progress / 17), PROCESSING_STEPS.length - 1)]?.label || "Unknown";
+        const currentStepName = job.current_step || "Processing";
         
         console.log(`%c[JOB ${id}] ${job.status.toUpperCase()} - ${progress}% - ${currentStepName}`, 
           `color: ${job.status === 'completed' ? 'green' : job.status === 'failed' ? 'red' : 'blue'}; font-weight: bold;`);
@@ -120,8 +121,17 @@ export default function RemoveWatermarkPage() {
           processingTime: job.processingTimeMs ? `${(job.processingTimeMs / 1000).toFixed(1)}s` : "(in progress)",
         });
 
-        // Update current step based on progress
-        const stepIndex = Math.min(Math.floor(progress / 17), PROCESSING_STEPS.length - 1);
+        // Map current_step to step index based on worker updates
+        const stepMap: Record<string, number> = {
+          "Waiting in queue": 0,
+          "Downloading video": 1,
+          "Analyzing video": 2,
+          "Removing watermark": 3,
+          "Uploading result": 4,
+          "Finalizing": 5,
+          "Complete": 5,
+        };
+        const stepIndex = stepMap[currentStepName] ?? Math.min(Math.floor(progress / 17), PROCESSING_STEPS.length - 1);
         setCurrentStep(stepIndex);
 
         // Check if completed or failed
@@ -130,6 +140,12 @@ export default function RemoveWatermarkPage() {
           setIsProcessing(false);
           setSuccess(true);
           toast.success("Watermark removed successfully!");
+          // Track MediaReady for Meta Pixel (key activation moment)
+          trackMediaReady({ 
+            jobId: job.jobId || job.id, 
+            platform: job.platform || 'unknown',
+            processingTimeMs: job.processingTimeMs 
+          });
           console.log("%c✅ JOB COMPLETED!", "color: green; font-size: 16px; font-weight: bold;");
           logRemove("✅ Job completed!", { 
             output_url: job.output?.downloadUrl || job.output_url,
@@ -189,9 +205,20 @@ export default function RemoveWatermarkPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          const { data } = await supabase.rpc("get_credit_balance", { p_user_id: session.user.id });
-          setCredits(data ?? 0);
-          logRemove("💰 Credits loaded:", data);
+          // Try bl_get_credit_balance first (BlankLogo), fallback to get_credit_balance
+          let credits = 0;
+          const { data: blCredits, error: blError } = await supabase.rpc("bl_get_credit_balance", { p_user_id: session.user.id });
+          
+          if (!blError && blCredits !== null) {
+            credits = blCredits;
+          } else {
+            // Fallback to original function
+            const { data: oldCredits } = await supabase.rpc("get_credit_balance", { p_user_id: session.user.id });
+            credits = oldCredits ?? 0;
+          }
+          
+          setCredits(credits);
+          logRemove("💰 Credits loaded:", credits);
         }
       } catch (err) {
         logRemove("❌ Failed to fetch credits:", err);
@@ -221,7 +248,8 @@ export default function RemoveWatermarkPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logRemove("🚀 Submitting job...", { mode, platform, videoUrl, credits });
+    console.log("%c🚀 FORM SUBMITTED", "color: blue; font-size: 16px; font-weight: bold;");
+    logRemove("🚀 Submitting job...", { mode, platform, videoUrl, selectedFile: selectedFile?.name, credits });
     
     setLoading(true);
     setError(null);
@@ -282,6 +310,8 @@ export default function RemoveWatermarkPage() {
         setJobId(data.jobId);
         setIsProcessing(true);
         setCurrentStep(0);
+        // Track GenerateRequested for Meta Pixel
+        trackGenerateRequested({ platform, processingMode: 'inpaint', jobId: data.jobId });
         console.log("%c🎬 JOB CREATED: " + data.jobId, "color: green; font-size: 14px; font-weight: bold;");
         logRemove("✅ Job created successfully:", {
           jobId: data.jobId,
@@ -293,10 +323,20 @@ export default function RemoveWatermarkPage() {
         });
         console.log("%c⏳ Starting job monitoring... Watch for progress updates below", "color: blue; font-style: italic;");
       } else if (mode === "upload" && selectedFile) {
+        logRemove("📤 Uploading file...", { 
+          filename: selectedFile.name, 
+          size: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
+          type: selectedFile.type,
+          platform, 
+          cropPixels 
+        });
+        
         const formData = new FormData();
         formData.append("video", selectedFile);
         formData.append("platform", platform);
         formData.append("crop_pixels", String(cropPixels));
+
+        logRemove("🌐 Calling upload API:", { url: `${apiUrl}/api/v1/jobs/upload` });
 
         const res = await fetch(`${apiUrl}/api/v1/jobs/upload`, {
           method: "POST",
@@ -307,16 +347,39 @@ export default function RemoveWatermarkPage() {
         });
 
         const data = await res.json();
-        logRemove("📦 Upload response:", { status: res.status, jobId: data.jobId });
+        logRemove("📦 Upload response:", { 
+          status: res.status, 
+          statusText: res.statusText,
+          jobId: data.jobId || data.job_id,
+          error: data.error,
+          message: data.message,
+          fullResponse: data
+        });
 
         if (!res.ok) {
-          throw new Error(data.error || "Failed to upload video");
+          logRemove("❌ Upload error details:", { 
+            status: res.status, 
+            error: data.error, 
+            message: data.message 
+          });
+          throw new Error(data.error || data.message || "Failed to upload video");
         }
 
-        setJobId(data.jobId);
+        const createdJobId = data.jobId || data.job_id;
+        setJobId(createdJobId);
         setIsProcessing(true);
         setCurrentStep(0);
-        logRemove("✅ Upload successful:", data.jobId);
+        // Track GenerateRequested for Meta Pixel
+        trackGenerateRequested({ platform, processingMode: 'inpaint', jobId: createdJobId });
+        console.log("%c🎬 UPLOAD JOB CREATED: " + createdJobId, "color: green; font-size: 14px; font-weight: bold;");
+        logRemove("✅ Upload successful:", {
+          jobId: createdJobId,
+          status: data.status,
+          filename: selectedFile.name
+        });
+      } else {
+        logRemove("⚠️ No valid submission mode:", { mode, hasUrl: !!videoUrl, hasFile: !!selectedFile });
+        throw new Error("Please provide a video URL or upload a file");
       }
     } catch (err) {
       logRemove("❌ Error:", err);
@@ -521,6 +584,10 @@ export default function RemoveWatermarkPage() {
                 <a
                   href={outputUrl}
                   download
+                  onClick={() => {
+                    // Track Download for Meta Pixel
+                    if (jobId) trackDownload({ jobId, platform });
+                  }}
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-green-600 hover:bg-green-500 transition font-medium"
                   data-testid="download-button"
                 >

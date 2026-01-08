@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { trackCompleteRegistration, trackLead } from "@/lib/meta-pixel";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -57,6 +58,9 @@ export default function SignupPage() {
     console.log("[SIGNUP] User ID:", data.user?.id);
     console.log("[SIGNUP] User email:", data.user?.email);
     console.log("[SIGNUP] 📧 Confirmation email sent");
+    
+    // Track CompleteRegistration for Meta Pixel
+    trackCompleteRegistration({ contentName: 'BlankLogo Account', status: 'pending_confirmation' });
     
     setSuccess(true);
     setLoading(false);

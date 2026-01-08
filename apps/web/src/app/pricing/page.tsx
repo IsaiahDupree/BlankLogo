@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, Zap, Crown, Rocket, CreditCard, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+import { trackViewPricing, trackSelectCreditPack, trackStartCheckout } from "@/lib/meta-pixel";
 
 // Stripe Price IDs (must match apps/web/src/lib/stripe.ts)
 const PRICE_IDS = {
@@ -93,6 +94,8 @@ export default function PricingPage() {
 
   useEffect(() => {
     console.log("[PRICING PAGE] 💰 Page mounted");
+    // Track pricing page view for Meta Pixel
+    trackViewPricing();
     // Check if user is logged in
     supabase.auth.getUser().then(({ data: { user } }) => {
       setIsLoggedIn(!!user);
@@ -122,12 +125,23 @@ export default function PricingPage() {
         return;
       }
 
+      // Track InitiateCheckout and get event_id for CAPI deduplication
+      const monthlyPlan = MONTHLY_PLANS.find(p => p.id === planId);
+      const creditPack = CREDIT_PACKS.find(p => p.id === planId);
+      const eventId = trackStartCheckout({
+        packId: planId,
+        packName: monthlyPlan?.name || `${creditPack?.credits} Credits`,
+        price: monthlyPlan?.price || creditPack?.price || 0,
+        credits: monthlyPlan?.credits || creditPack?.credits || 0,
+      });
+
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           priceId,
           mode: isSubscription ? "subscription" : "payment",
+          event_id: eventId, // Pass to Stripe for CAPI deduplication
         }),
       });
 

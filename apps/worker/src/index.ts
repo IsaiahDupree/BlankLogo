@@ -249,7 +249,7 @@ healthServer.listen(PORT, () => {
   console.log(`[Worker] Endpoints: /health, /diagnostics, /readyz`);
 });
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? 2);
-const INPAINT_SERVICE_URL = process.env.INPAINT_SERVICE_URL || "http://localhost:8081";
+const INPAINT_SERVICE_URL = process.env.INPAINT_SERVICE_URL || "https://blanklogo-inpaint.onrender.com";
 
 // Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || "";
@@ -992,23 +992,25 @@ async function removeWatermark(
   cropPixels: number,
   cropPosition: string,
   videoInfo: VideoInfo,
-  processingMode: ProcessingMode = "inpaint"
+  processingMode: ProcessingMode = "crop"
 ): Promise<{ mode: string; watermarksDetected?: number }> {
-  // Try inpainting first if service is configured, fallback to crop
-  const inpaintUrl = process.env.INPAINT_SERVICE_URL;
-  
-  if (inpaintUrl && !inpaintUrl.includes('localhost')) {
-    console.log(`[Worker] 🤖 Using AI inpainting (${inpaintUrl})`);
-    try {
-      return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
-    } catch (err) {
-      console.log(`[Worker] ⚠️ Inpainting failed, falling back to crop: ${err}`);
-    }
+  // Use crop mode by default for local dev, or when explicitly requested
+  if (processingMode === "crop") {
+    console.log(`[Worker] ✂️ Using FFmpeg crop mode`);
+    return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
   }
   
-  // Fallback to simple crop mode (FFmpeg only, no external service)
-  console.log(`[Worker] ✂️ Using FFmpeg crop mode (${cropPixels}px from ${cropPosition})`);
-  return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
+  // Use inpainting for inpaint or auto mode
+  const inpaintUrl = process.env.INPAINT_SERVICE_URL || "https://blanklogo-inpaint.onrender.com";
+  console.log(`[Worker] 🤖 Using AI inpainting (${inpaintUrl})`);
+  
+  try {
+    return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
+  } catch (error) {
+    // Fall back to crop if inpainting fails
+    console.log(`[Worker] ⚠️ Inpainting failed, falling back to crop mode`);
+    return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
+  }
 }
 
 async function uploadToStorage(filePath: string, jobId: string, filename: string): Promise<string> {

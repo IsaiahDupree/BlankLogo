@@ -2,7 +2,26 @@
  * Meta Pixel Integration
  * 
  * Client-side tracking for Meta Ads (Facebook/Instagram)
- * Standard events: PageView, ViewContent, AddToCart, InitiateCheckout, Purchase
+ * 
+ * Standard Events (for optimization):
+ * - PageView: automatic on every page
+ * - ViewContent: landing, features, pricing, gallery pages
+ * - Lead: waitlist, demo request, partial signup
+ * - CompleteRegistration: successful account creation
+ * - InitiateCheckout: before Stripe redirect
+ * - Subscribe: subscription activated (mirror from CAPI)
+ * - Purchase: one-time credit purchase (mirror from CAPI)
+ * 
+ * Custom Events (for retargeting):
+ * - GenerateRequested: user clicks "Remove Watermark"
+ * - JobStarted: job status becomes processing
+ * - MediaReady: job completed, output available
+ * - Download: user downloads the artifact
+ * - Share: user shares/copies link
+ * 
+ * CAPI Deduplication:
+ * - Generate event_id for InitiateCheckout/Purchase/Subscribe
+ * - Same event_id sent to server for CAPI deduplication
  */
 
 // Types for Meta Pixel events
@@ -25,7 +44,18 @@ export interface MetaEventParams {
     quantity: number;
     item_price?: number;
   }>;
+  event_id?: string; // For CAPI deduplication
   [key: string]: unknown;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EVENT ID GENERATION (for CAPI deduplication)
+// ═══════════════════════════════════════════════════════════════════
+
+export function generateEventId(prefix: string = 'evt'): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `${prefix}_${timestamp}_${random}`;
 }
 
 // Extend Window interface for fbq
@@ -236,11 +266,52 @@ export function trackCompleteRegistration(params?: {
   } : undefined, { debug });
 }
 
+// Subscribe - when user subscribes (standard Meta event)
+export function trackSubscribe(params: {
+  contentIds: string[];
+  contentName?: string;
+  value: number;
+  currency?: string;
+  predictedLtv?: number;
+  eventId?: string; // For CAPI deduplication
+}, debug?: boolean): void {
+  const eventId = params.eventId || generateEventId('sub');
+  trackEvent('Subscribe', {
+    content_ids: params.contentIds,
+    content_name: params.contentName,
+    content_type: 'product',
+    value: params.value,
+    currency: params.currency || 'USD',
+    predicted_ltv: params.predictedLtv,
+    event_id: eventId,
+  }, { debug });
+}
+
 // ═══════════════════════════════════════════════════════════════════
-// BLANKLOGO-SPECIFIC EVENTS
+// VIEWCONTENT HELPERS (for intent pages)
 // ═══════════════════════════════════════════════════════════════════
 
-// Track when user views pricing page
+// Track landing page view (from ads)
+export function trackViewLanding(params?: {
+  variant?: string;
+  source?: string;
+}, debug?: boolean): void {
+  trackViewContent({
+    contentName: 'Landing Page',
+    contentCategory: 'landing',
+    contentId: params?.variant,
+  }, debug);
+}
+
+// Track features page view
+export function trackViewFeatures(debug?: boolean): void {
+  trackViewContent({
+    contentName: 'Features Page',
+    contentCategory: 'features',
+  }, debug);
+}
+
+// Track pricing page view
 export function trackViewPricing(debug?: boolean): void {
   trackViewContent({
     contentName: 'Pricing Page',
@@ -248,7 +319,19 @@ export function trackViewPricing(debug?: boolean): void {
   }, debug);
 }
 
-// Track when user selects a credit pack
+// Track gallery/examples page view
+export function trackViewGallery(debug?: boolean): void {
+  trackViewContent({
+    contentName: 'Gallery Page',
+    contentCategory: 'gallery',
+  }, debug);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CHECKOUT EVENTS (with event_id for CAPI dedup)
+// ═══════════════════════════════════════════════════════════════════
+
+// Track when user selects a credit pack (AddToCart)
 export function trackSelectCreditPack(params: {
   packName: string;
   packId: string;
@@ -263,17 +346,24 @@ export function trackSelectCreditPack(params: {
   }, debug);
 }
 
-// Track when user starts Stripe checkout
+// Track when user starts Stripe checkout (returns event_id for CAPI)
 export function trackStartCheckout(params: {
   packId: string;
+  packName?: string;
   price: number;
   credits: number;
-}, debug?: boolean): void {
+}, debug?: boolean): string {
+  const eventId = generateEventId('checkout');
   trackInitiateCheckout({
     contentIds: [params.packId],
     value: params.price,
     numItems: 1,
   }, debug);
+  // Store event_id for passing to Stripe metadata (for CAPI dedup)
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('bl_checkout_event_id', eventId);
+  }
+  return eventId;
 }
 
 // Track successful credit purchase
@@ -293,13 +383,96 @@ export function trackCreditPurchase(params: {
   }, debug);
 }
 
-// Track job creation
-export function trackJobCreated(params: {
+// Track subscription purchase (client-side mirror for CAPI dedup)
+export function trackSubscriptionPurchase(params: {
+  planId: string;
+  planName: string;
+  price: number;
+  interval?: 'month' | 'year';
+  eventId?: string; // Must match CAPI event_id
+}, debug?: boolean): void {
+  const eventId = params.eventId || sessionStorage.getItem('bl_checkout_event_id') || generateEventId('sub');
+  trackSubscribe({
+    contentIds: [params.planId],
+    contentName: params.planName,
+    value: params.price,
+    eventId,
+  }, debug);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CUSTOM EVENTS: MEDIA JOB FLOW (for retargeting)
+// ═══════════════════════════════════════════════════════════════════
+
+// GenerateRequested - user clicks "Remove Watermark" button
+export function trackGenerateRequested(params: {
   platform: string;
   processingMode: string;
+  jobId?: string;
 }, debug?: boolean): void {
-  trackCustomEvent('JobCreated', {
+  trackCustomEvent('GenerateRequested', {
     content_category: 'watermark_removal',
+    content_name: params.platform,
+    content_ids: params.jobId ? [params.jobId] : undefined,
+    processing_mode: params.processingMode,
+  }, { debug });
+}
+
+// JobStarted - job status becomes "processing"
+export function trackJobStarted(params: {
+  jobId: string;
+  platform: string;
+}, debug?: boolean): void {
+  trackCustomEvent('JobStarted', {
+    content_category: 'watermark_removal',
+    content_ids: [params.jobId],
     content_name: params.platform,
   }, { debug });
 }
+
+// MediaReady - job completed, output available (key activation moment)
+export function trackMediaReady(params: {
+  jobId: string;
+  platform: string;
+  processingTimeMs?: number;
+}, debug?: boolean): void {
+  trackCustomEvent('MediaReady', {
+    content_category: 'watermark_removal',
+    content_ids: [params.jobId],
+    content_name: params.platform,
+    processing_time_ms: params.processingTimeMs,
+  }, { debug });
+}
+
+// Download - user downloads the artifact
+export function trackDownload(params: {
+  jobId: string;
+  platform?: string;
+  fileSizeBytes?: number;
+}, debug?: boolean): void {
+  trackCustomEvent('Download', {
+    content_category: 'watermark_removal',
+    content_ids: [params.jobId],
+    content_name: params.platform,
+    file_size_bytes: params.fileSizeBytes,
+  }, { debug });
+}
+
+// Share - user shares/copies link
+export function trackShare(params: {
+  jobId: string;
+  method?: 'copy_link' | 'social' | 'email';
+}, debug?: boolean): void {
+  trackCustomEvent('Share', {
+    content_category: 'watermark_removal',
+    content_ids: [params.jobId],
+    share_method: params.method,
+  }, { debug });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEGACY ALIAS (for backward compatibility)
+// ═══════════════════════════════════════════════════════════════════
+
+// @deprecated Use trackGenerateRequested instead
+export const trackJobCreated = trackGenerateRequested;

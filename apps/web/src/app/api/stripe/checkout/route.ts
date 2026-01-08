@@ -18,8 +18,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { priceId, mode } = await request.json();
-  console.log("[STRIPE CHECKOUT] 📦 Request:", { priceId, mode });
+  const { priceId, mode, event_id } = await request.json();
+  console.log("[STRIPE CHECKOUT] 📦 Request:", { priceId, mode, event_id });
 
   if (!priceId) {
     console.log("[STRIPE CHECKOUT] ❌ Missing priceId");
@@ -110,11 +110,13 @@ export async function POST(request: Request) {
       cancel_url: `${baseUrl}/app/credits?canceled=true`,
       metadata: {
         user_id: user.id,
+        event_id: event_id || '', // For Meta CAPI deduplication
       },
       ...(checkoutMode === "subscription" && {
         subscription_data: {
           metadata: {
             user_id: user.id,
+            event_id: event_id || '',
           },
         },
       }),

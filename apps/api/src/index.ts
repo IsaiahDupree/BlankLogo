@@ -430,6 +430,7 @@ interface JobStatus {
   jobId: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
   progress: number;
+  current_step?: string;
   input?: {
     filename: string;
     sizeBytes?: number;
@@ -1029,7 +1030,7 @@ app.post('/api/v1/jobs', authenticateToken, jobsRateLimiter, async (req: Authent
       crop_pixels,
       crop_position = 'bottom',
       platform = 'sora',
-      processing_mode = 'inpaint',
+      processing_mode = process.env.DEFAULT_PROCESSING_MODE || 'inpaint',
       webhook_url,
       metadata,
     } = req.body;
@@ -1179,7 +1180,7 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       crop_pixels,
       crop_position = 'bottom',
       platform = 'sora',
-      processing_mode = 'inpaint',
+      processing_mode = process.env.DEFAULT_PROCESSING_MODE || 'inpaint', // Inpaint for corner watermarks like Sora
       webhook_url,
     } = req.body;
 
@@ -1307,12 +1308,14 @@ app.get('/api/v1/jobs/:jobId', authenticateToken, async (req: AuthenticatedReque
 
     // Get real progress from database, or calculate based on status
     const realProgress = job.progress ?? (job.status === 'completed' ? 100 : job.status === 'failed' ? 0 : job.status === 'processing' ? 50 : 0);
-    console.log(`[JOB STATUS] ✅ Job ${jobId}: status=${job.status}, progress=${realProgress}%, current_step=${job.current_step || 'N/A'}`);
+    const currentStep = job.current_step || (job.status === 'queued' ? 'Waiting in queue' : job.status === 'completed' ? 'Complete' : 'Processing');
+    console.log(`[JOB STATUS] ✅ Job ${jobId}: status=${job.status}, progress=${realProgress}%, current_step=${currentStep}`);
     
     const response: JobStatus = {
       jobId: job.id,
       status: job.status,
       progress: realProgress,
+      current_step: currentStep,
       input: {
         filename: job.input_filename,
         sizeBytes: job.input_size_bytes,

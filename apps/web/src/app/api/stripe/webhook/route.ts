@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { stripe, CREDITS_BY_PACK, CREDITS_BY_SUBSCRIPTION, STRIPE_PRICE_IDS } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
+import { trackPurchaseCAPI, trackSubscribeCAPI, generateEventId } from "@/lib/meta-capi";
 import Stripe from "stripe";
 
 export async function POST(request: Request) {
@@ -93,10 +94,51 @@ async function handleCheckoutComplete(
       });
 
       console.log(`Added ${credits} credits to user ${userId}`);
+
+      // Track Purchase via Meta CAPI (server-side)
+      const eventId = session.metadata?.event_id || generateEventId('purchase');
+      const price = session.amount_total ? session.amount_total / 100 : 0;
+      await trackPurchaseCAPI({
+        eventId,
+        userId,
+        email: session.customer_email || undefined,
+        value: price,
+        currency: session.currency?.toUpperCase() || 'USD',
+        contentIds: [packKey],
+        contentName: `${credits} Credits Pack`,
+        orderId: session.id,
+      });
     }
   }
 
-  // Subscription - credits are added on invoice.paid
+  // Subscription - handle Subscribe event
+  if (session.mode === "subscription") {
+    const subscriptionId = session.subscription as string;
+    if (subscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
+      const priceId = sub.items.data[0]?.price?.id;
+      
+      const tierKey = Object.entries(STRIPE_PRICE_IDS).find(
+        ([, id]) => id === priceId
+      )?.[0];
+
+      if (tierKey) {
+        // Track Subscribe via Meta CAPI (server-side)
+        const eventId = session.metadata?.event_id || generateEventId('subscribe');
+        const price = session.amount_total ? session.amount_total / 100 : 0;
+        await trackSubscribeCAPI({
+          eventId,
+          userId,
+          email: session.customer_email || undefined,
+          value: price,
+          currency: session.currency?.toUpperCase() || 'USD',
+          contentIds: [tierKey],
+          contentName: `${tierKey} Subscription`,
+          predictedLtv: price * 12, // Estimate 12 months LTV
+        });
+      }
+    }
+  }
 }
 
 async function handleInvoicePaid(
