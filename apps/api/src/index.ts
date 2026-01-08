@@ -325,35 +325,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 );
 
-// Middleware - CORS configuration
-const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [
-  'https://www.blanklogo.app',
-  'https://blanklogo.app',
-  'https://blanklogo-web.vercel.app',
-  'http://localhost:3939',
-  'http://localhost:3838',
-  'http://127.0.0.1:3939',
-];
-
+// Middleware - CORS configuration (allow all origins for now to fix "Failed to fetch")
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.some(allowed => origin.startsWith(allowed.replace(/\/$/, '')))) {
-      return callback(null, true);
-    }
-    
-    // Also allow any *.vercel.app for preview deployments
-    if (origin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
-    
-    console.warn(`[CORS] Blocked origin: ${origin}`);
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: true, // Allow all origins - can restrict later
   credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 app.use(express.json());
 
