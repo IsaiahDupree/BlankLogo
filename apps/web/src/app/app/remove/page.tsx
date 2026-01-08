@@ -314,6 +314,7 @@ export default function RemoveWatermarkPage() {
         setJobId(data.jobId);
         setIsProcessing(true);
         setCurrentStep(0);
+        setError(null); // Clear any previous errors when job starts
         // Track GenerateRequested for Meta Pixel
         trackGenerateRequested({ platform, processingMode: 'inpaint', jobId: data.jobId });
         console.log("%c🎬 JOB CREATED: " + data.jobId, "color: green; font-size: 14px; font-weight: bold;");
@@ -373,6 +374,7 @@ export default function RemoveWatermarkPage() {
         setJobId(createdJobId);
         setIsProcessing(true);
         setCurrentStep(0);
+        setError(null); // Clear any previous errors when job starts
         // Track GenerateRequested for Meta Pixel
         trackGenerateRequested({ platform, processingMode: 'inpaint', jobId: createdJobId });
         console.log("%c🎬 UPLOAD JOB CREATED: " + createdJobId, "color: green; font-size: 14px; font-weight: bold;");
@@ -660,7 +662,7 @@ export default function RemoveWatermarkPage() {
           </div>
         )}
 
-        {error && (
+        {error && !isProcessing && (
           <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
             <X className="w-4 h-4" />
             {error}
