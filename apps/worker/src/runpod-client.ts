@@ -16,7 +16,8 @@ const logger = {
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const RUNPOD_POD_ID = process.env.RUNPOD_POD_ID;
-const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID;
+const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || 'qknem6lvmldqzv';
+const USE_SERVERLESS = process.env.RUNPOD_USE_SERVERLESS === 'true' || !RUNPOD_POD_ID;
 
 interface PodStatus {
   id: string;
@@ -64,6 +65,38 @@ interface ProcessingResult {
   };
 }
 
+interface ServerlessJobResponse {
+  id: string;
+  status: string;
+}
+
+interface ServerlessStatusResponse {
+  status: 'IN_QUEUE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  output?: {
+    video_base64?: string;
+    error?: string;
+    stats?: {
+      mode?: string;
+      frames_processed?: number;
+      watermarks_detected?: number;
+      processing_time_s?: number;
+    };
+  };
+  error?: string;
+}
+
+interface ProcessVideoResponse {
+  video_base64?: string;
+  error?: string;
+  stats?: {
+    mode?: string;
+    frames_processed?: number;
+    watermarks_detected?: number;
+    processing_time_s?: number;
+    total_time_s?: number;
+  };
+}
+
 export class RunPodClient {
   private apiKey: string;
   private podId: string | null;
@@ -101,7 +134,7 @@ export class RunPodClient {
       body: JSON.stringify({ query }),
     });
 
-    const result = await response.json();
+    const result = await response.json() as { data?: T; errors?: any[] };
     
     if (result.errors) {
       throw new Error(`RunPod API error: ${JSON.stringify(result.errors)}`);
@@ -317,9 +350,109 @@ export class RunPodClient {
   }
 
   /**
-   * Process video with GPU acceleration
+   * Process video with GPU acceleration (Serverless)
    */
-  async processVideo(
+  async processVideoServerless(
+    videoBuffer: Buffer,
+    options: {
+      mode?: 'crop' | 'inpaint' | 'auto';
+      platform?: string;
+    } = {}
+  ): Promise<ProcessingResult> {
+    if (!this.endpointId) {
+      throw new Error('No serverless endpoint ID configured');
+    }
+
+    logger.info(`[RunPod Serverless] Submitting job to endpoint ${this.endpointId}...`);
+    this.lastActivityTime = Date.now();
+
+    const videoBase64 = videoBuffer.toString('base64');
+    const payload = {
+      input: {
+        video_base64: videoBase64,
+        mode: options.mode || 'inpaint',
+        platform: options.platform || 'sora',
+      },
+    };
+
+    // Submit job to serverless endpoint
+    const runUrl = `https://api.runpod.ai/v2/${this.endpointId}/run`;
+    const response = await fetch(runUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Serverless submit failed: ${response.status} ${errorText}`);
+    }
+
+    const submitResult = await response.json() as ServerlessJobResponse;
+    const jobId = submitResult.id;
+    logger.info(`[RunPod Serverless] Job submitted: ${jobId}`);
+
+    // Poll for completion
+    return this.pollServerlessJob(jobId, options.mode || 'inpaint');
+  }
+
+  /**
+   * Poll serverless job until complete
+   */
+  private async pollServerlessJob(jobId: string, mode: string): Promise<ProcessingResult> {
+    const statusUrl = `https://api.runpod.ai/v2/${this.endpointId}/status/${jobId}`;
+    const maxWaitMs = 300000; // 5 minutes
+    const pollIntervalMs = 2000;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const response = await fetch(statusUrl, {
+        headers: { 'Authorization': `Bearer ${this.apiKey}` },
+      });
+
+      const status = await response.json() as ServerlessStatusResponse;
+      logger.info(`[RunPod Serverless] Job ${jobId}: ${status.status}`);
+
+      if (status.status === 'COMPLETED') {
+        const output = status.output || {};
+        if (output.error) {
+          throw new Error(`Processing error: ${output.error}`);
+        }
+
+        return {
+          videoBase64: output.video_base64 || '',
+          stats: {
+            mode: output.stats?.mode || mode,
+            framesProcessed: output.stats?.frames_processed || 0,
+            watermarksDetected: output.stats?.watermarks_detected || 0,
+            processingTimeS: output.stats?.processing_time_s || 0,
+            totalTimeS: (Date.now() - startTime) / 1000,
+          },
+        };
+      }
+
+      if (status.status === 'FAILED') {
+        throw new Error(`Job failed: ${status.error || status.output?.error || 'Unknown error'}`);
+      }
+
+      if (status.status === 'CANCELLED') {
+        throw new Error('Job was cancelled');
+      }
+
+      // IN_QUEUE or IN_PROGRESS - keep polling
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+    }
+
+    throw new Error(`Job ${jobId} timed out after ${maxWaitMs / 1000}s`);
+  }
+
+  /**
+   * Process video with GPU acceleration (Pod-based)
+   */
+  async processVideoPod(
     videoBuffer: Buffer,
     options: {
       mode?: 'crop' | 'inpaint' | 'auto';
@@ -328,7 +461,7 @@ export class RunPodClient {
       cropPosition?: string;
     } = {}
   ): Promise<ProcessingResult> {
-    logger.info('[RunPod] Processing video on GPU...');
+    logger.info('[RunPod Pod] Processing video on GPU...');
     
     // Ensure pod is running
     const health = await this.ensureRunning();
@@ -360,16 +493,16 @@ export class RunPodClient {
       throw new Error(`GPU processing failed: ${response.statusText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as ProcessVideoResponse;
 
     if (result.error) {
       throw new Error(result.error);
     }
 
-    logger.info(`[RunPod] Processing complete: ${result.stats?.processing_time_s}s`);
+    logger.info(`[RunPod Pod] Processing complete: ${result.stats?.processing_time_s}s`);
 
     return {
-      videoBase64: result.video_base64,
+      videoBase64: result.video_base64 || '',
       stats: {
         mode: result.stats?.mode || options.mode || 'inpaint',
         framesProcessed: result.stats?.frames_processed || 0,
@@ -378,6 +511,30 @@ export class RunPodClient {
         totalTimeS: result.stats?.total_time_s || 0,
       },
     };
+  }
+
+  /**
+   * Process video - auto-selects serverless or pod based on config
+   */
+  async processVideo(
+    videoBuffer: Buffer,
+    options: {
+      mode?: 'crop' | 'inpaint' | 'auto';
+      platform?: string;
+      cropPixels?: number;
+      cropPosition?: string;
+      useServerless?: boolean;
+    } = {}
+  ): Promise<ProcessingResult> {
+    const useServerless = options.useServerless ?? (USE_SERVERLESS || !this.podId);
+
+    if (useServerless && this.endpointId) {
+      return this.processVideoServerless(videoBuffer, options);
+    } else if (this.podId) {
+      return this.processVideoPod(videoBuffer, options);
+    } else {
+      throw new Error('No RunPod endpoint or pod configured');
+    }
   }
 
   /**
