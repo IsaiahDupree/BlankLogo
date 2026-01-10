@@ -12,6 +12,7 @@ import * as path from 'path';
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const RUNPOD_POD_ID = process.env.RUNPOD_POD_ID;
+const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || 'qknem6lvmldqzv';
 const TEST_VIDEO_PATH = path.join(__dirname, '../../test-videos/sora-watermark-test.mp4');
 
 // Skip tests if no RunPod credentials
@@ -98,15 +99,15 @@ describeRunPod('RunPod GPU Integration', () => {
   });
 
   describe('Pod Lifecycle', () => {
-    it('should ensure pod is running', async () => {
+    it.skip('should ensure pod is running (skip - using serverless)', async () => {
       const health = await client.ensureRunning();
       
       console.log('After ensureRunning:', JSON.stringify(health, null, 2));
       
       expect(health.status).toBe('healthy');
-    }, 180000); // 3 minute timeout for pod startup
+    }, 180000);
 
-    it('should have GPU available when running', async () => {
+    it.skip('should have GPU available when running (skip - using serverless)', async () => {
       const health = await client.getHealth();
       
       if (health.status === 'healthy') {
@@ -116,7 +117,7 @@ describeRunPod('RunPod GPU Integration', () => {
       }
     }, 30000);
 
-    it('should have HTTP endpoint when running', async () => {
+    it.skip('should have HTTP endpoint when running (skip - using serverless)', async () => {
       const health = await client.getHealth();
       
       if (health.status === 'healthy') {
@@ -127,35 +128,54 @@ describeRunPod('RunPod GPU Integration', () => {
   });
 });
 
-describeRunPod('RunPod Video Processing', () => {
+// Serverless-specific tests
+describeRunPod('RunPod Serverless', () => {
+  it('should have serverless endpoint configured', () => {
+    expect(RUNPOD_ENDPOINT_ID).toBeTruthy();
+    console.log(`Serverless Endpoint ID: ${RUNPOD_ENDPOINT_ID}`);
+  });
+
+  it('should get serverless health', async () => {
+    const response = await fetch(`https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/health`, {
+      headers: { 'Authorization': `Bearer ${RUNPOD_API_KEY}` },
+    });
+    const health = await response.json();
+    
+    console.log('Serverless Health:', JSON.stringify(health, null, 2));
+    
+    expect(health.jobs).toBeDefined();
+    expect(health.workers).toBeDefined();
+  }, 30000);
+});
+
+describeRunPod('RunPod Video Processing (Serverless)', () => {
   let client: RunPodClient;
 
   beforeAll(() => {
     client = new RunPodClient({
       apiKey: RUNPOD_API_KEY,
-      podId: RUNPOD_POD_ID,
+      podId: undefined, // Use serverless
+      endpointId: RUNPOD_ENDPOINT_ID,
     });
   });
 
-  it('should process video on GPU', async () => {
+  it.skip('should process video on GPU (skip - requires Docker image deployed)', async () => {
     // Skip if no test video
     if (!fs.existsSync(TEST_VIDEO_PATH)) {
       console.log('Test video not found, skipping...');
       return;
     }
 
-    // Ensure pod is running
-    await client.ensureRunning();
-
     // Read test video
     const videoBuffer = fs.readFileSync(TEST_VIDEO_PATH);
     console.log(`Input video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
-    // Process on GPU
+    // Process on GPU via serverless
     const startTime = Date.now();
     const result = await client.processVideo(videoBuffer, {
       mode: 'inpaint',
       platform: 'sora',
+      useServerless: true,
     });
     const totalTime = (Date.now() - startTime) / 1000;
 
