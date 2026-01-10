@@ -157,7 +157,8 @@ class WatermarkDetector:
         self, 
         frames: List[np.ndarray], 
         platform: str = "sora",
-        use_fallback: bool = True
+        use_fallback: bool = True,
+        progress_callback: callable = None
     ) -> List[Dict[str, Any]]:
         """
         Detect watermarks in all frames of a video.
@@ -167,6 +168,7 @@ class WatermarkDetector:
             frames: List of BGR frames
             platform: Platform name for fallback detection
             use_fallback: Whether to use fallback bbox if no detections
+            progress_callback: Optional callback(current, total) for progress
             
         Returns:
             List of detection results, one per frame
@@ -176,9 +178,12 @@ class WatermarkDetector:
         results = []
         missed_indices = []
         bbox_centers = []
+        total = len(frames)
         
         # First pass: detect in all frames
         for idx, frame in enumerate(tqdm(frames, desc="Detecting watermarks")):
+            if progress_callback:
+                progress_callback(idx + 1, total)
             detection = self.detect_frame(frame)
             results.append(detection)
             

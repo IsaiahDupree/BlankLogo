@@ -289,7 +289,8 @@ class WatermarkInpainter:
     def inpaint_video(
         self, 
         frames: List[np.ndarray], 
-        detections: List[dict]
+        detections: List[dict],
+        progress_callback: callable = None
     ) -> List[np.ndarray]:
         """
         Inpaint all frames of a video.
@@ -297,6 +298,7 @@ class WatermarkInpainter:
         Args:
             frames: List of BGR frames
             detections: List of detection results from WatermarkDetector
+            progress_callback: Optional callback(current, total) for progress
             
         Returns:
             List of inpainted frames
@@ -304,10 +306,14 @@ class WatermarkInpainter:
         from tqdm import tqdm
         
         results = []
+        total = len(frames)
         
         for idx, (frame, detection) in enumerate(
-            tqdm(zip(frames, detections), total=len(frames), desc="Inpainting frames")
+            tqdm(zip(frames, detections), total=total, desc="Inpainting frames")
         ):
+            if progress_callback:
+                progress_callback(idx + 1, total)
+            
             if detection["detected"] and detection["bbox"]:
                 mask = self.create_mask(frame.shape, detection["bbox"])
                 inpainted = self.inpaint_frame(frame, mask)

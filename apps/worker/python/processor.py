@@ -16,6 +16,8 @@ from tqdm import tqdm
 
 from detector import WatermarkDetector
 from inpainter import WatermarkInpainter
+import time
+from datetime import datetime
 
 
 class ProcessingMode(str, Enum):
@@ -25,16 +27,90 @@ class ProcessingMode(str, Enum):
     AUTO = "auto"           # Auto-detect watermark position + inpaint
 
 
+class JobStatus:
+    """Tracks and reports job progress."""
+    
+    def __init__(self, job_id: str = None):
+        self.job_id = job_id or f"job_{int(time.time() * 1000)}"
+        self.start_time = time.time()
+        self.current_stage = "initializing"
+        self.progress = 0
+        self.total_frames = 0
+        self.processed_frames = 0
+        self.watermarks_detected = 0
+        self.errors = []
+        
+    def log(self, message: str, level: str = "info"):
+        """Log with job context."""
+        elapsed = time.time() - self.start_time
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        prefix = f"[{timestamp}] [{self.job_id}] [{self.current_stage}]"
+        
+        if level == "info":
+            logger.info(f"{prefix} {message}")
+        elif level == "warn":
+            logger.warning(f"{prefix} {message}")
+        elif level == "error":
+            logger.error(f"{prefix} {message}")
+            self.errors.append(message)
+        
+        # Always print to console for visibility
+        print(f"{prefix} {message}", flush=True)
+    
+    def update(self, stage: str = None, progress: int = None, message: str = None):
+        """Update job status."""
+        if stage:
+            self.current_stage = stage
+        if progress is not None:
+            self.progress = progress
+        if message:
+            self.log(message)
+    
+    def frame_progress(self, current: int, total: int, extra: str = ""):
+        """Report frame-by-frame progress."""
+        self.processed_frames = current
+        self.total_frames = total
+        pct = int((current / total) * 100) if total > 0 else 0
+        elapsed = time.time() - self.start_time
+        fps = current / elapsed if elapsed > 0 else 0
+        eta = (total - current) / fps if fps > 0 else 0
+        
+        msg = f"Frame {current}/{total} ({pct}%) | {fps:.1f} fps | ETA: {eta:.1f}s"
+        if extra:
+            msg += f" | {extra}"
+        
+        # Log every 10% or every 25 frames
+        if current % max(1, total // 10) == 0 or current % 25 == 0 or current == total:
+            self.log(msg)
+    
+    def summary(self) -> dict:
+        """Get job summary."""
+        elapsed = time.time() - self.start_time
+        return {
+            "job_id": self.job_id,
+            "status": "completed" if not self.errors else "failed",
+            "stage": self.current_stage,
+            "progress": self.progress,
+            "elapsed_seconds": round(elapsed, 2),
+            "frames_processed": self.processed_frames,
+            "total_frames": self.total_frames,
+            "watermarks_detected": self.watermarks_detected,
+            "fps": round(self.processed_frames / elapsed, 2) if elapsed > 0 else 0,
+            "errors": self.errors,
+        }
+
+
 class VideoProcessor:
     """
     Main video processing pipeline.
     Supports multiple modes: crop (fast) and inpaint (quality).
     """
     
-    def __init__(self, mode: ProcessingMode = ProcessingMode.CROP):
+    def __init__(self, mode: ProcessingMode = ProcessingMode.CROP, job_id: str = None):
         self.mode = mode
         self._detector = None
         self._inpainter = None
+        self.status = JobStatus(job_id)
     
     @property
     def detector(self) -> WatermarkDetector:
@@ -195,48 +271,70 @@ class VideoProcessor:
         """
         Process video using YOLO detection + LAMA inpainting (quality mode).
         """
-        logger.info("Processing with inpaint mode (YOLO + LAMA)")
+        self.status.update(stage="init", progress=0, message="Starting inpaint mode (YOLO + LAMA)")
         
         # Load frames
+        self.status.update(stage="loading", progress=5, message="Loading video frames...")
         if progress_callback:
             progress_callback(5)
         
         frames, fps, width, height = self.load_video_frames(input_path)
+        self.status.total_frames = len(frames)
+        self.status.update(message=f"Loaded {len(frames)} frames ({width}x{height} @ {fps:.1f}fps)")
         
         if progress_callback:
-            progress_callback(20)
+            progress_callback(15)
         
         # Detect watermarks
-        detections = self.detector.detect_video(frames)
+        self.status.update(stage="detecting", progress=15, message="Detecting watermarks with YOLO...")
+        detections = self.detector.detect_video(
+            frames, 
+            progress_callback=lambda i, n: self.status.frame_progress(i, n, "detection")
+        )
         detected_count = sum(1 for d in detections if d["detected"])
+        self.status.watermarks_detected = detected_count
         
-        logger.info(f"Detected watermarks in {detected_count}/{len(frames)} frames")
+        self.status.update(progress=40, message=f"Detected watermarks in {detected_count}/{len(frames)} frames")
         
         if progress_callback:
-            progress_callback(50)
+            progress_callback(40)
         
         # Inpaint frames
         if detected_count > 0:
-            inpainted_frames = self.inpainter.inpaint_video(frames, detections)
+            self.status.update(stage="inpainting", progress=45, message="Inpainting frames with LAMA...")
+            inpainted_frames = self.inpainter.inpaint_video(
+                frames, 
+                detections,
+                progress_callback=lambda i, n: self.status.frame_progress(i, n, "inpaint")
+            )
         else:
-            logger.warning("No watermarks detected, returning original video")
+            self.status.update(stage="skipped", message="No watermarks detected, returning original video")
             inpainted_frames = frames
         
+        self.status.update(stage="encoding", progress=85, message="Encoding output video...")
         if progress_callback:
             progress_callback(85)
         
         # Save output
         self.save_video_frames(inpainted_frames, output_path, fps, input_path)
         
+        self.status.update(stage="complete", progress=100, message="Processing complete!")
         if progress_callback:
             progress_callback(100)
         
+        # Log summary
+        summary = self.status.summary()
+        self.status.log(f"SUMMARY: {summary['frames_processed']} frames, {summary['watermarks_detected']} watermarks, {summary['elapsed_seconds']}s ({summary['fps']} fps)")
+        
         return {
             "mode": "inpaint",
+            "job_id": self.status.job_id,
             "frames_processed": len(frames),
             "watermarks_detected": detected_count,
             "original_size": (width, height),
-            "output_size": (width, height)  # Inpainting preserves dimensions
+            "output_size": (width, height),
+            "elapsed_seconds": summary["elapsed_seconds"],
+            "fps": summary["fps"]
         }
     
     def process(
