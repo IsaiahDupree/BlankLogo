@@ -44,6 +44,8 @@ def download_lama_model(url: str, model_md5: str) -> str:
     import torch
     from torch.hub import download_url_to_file, get_dir
     
+    logger.info(f"[LAMA] Checking for model at URL: {url}")
+    
     # Get cache path
     parts = urlparse(url)
     hub_dir = get_dir()
@@ -52,17 +54,31 @@ def download_lama_model(url: str, model_md5: str) -> str:
     filename = os.path.basename(parts.path)
     cached_file = os.path.join(model_dir, filename)
     
+    logger.info(f"[LAMA] Cache directory: {model_dir}")
+    logger.info(f"[LAMA] Expected model path: {cached_file}")
+    
     # Download if not exists
     if not os.path.exists(cached_file):
-        logger.info(f"Downloading LAMA model to {cached_file}")
-        download_url_to_file(url, cached_file, None, progress=True)
+        logger.info(f"[LAMA] Model not found, downloading from {url}")
+        logger.info(f"[LAMA] Download destination: {cached_file}")
+        try:
+            download_url_to_file(url, cached_file, None, progress=True)
+            logger.info(f"[LAMA] Download completed")
+        except Exception as e:
+            logger.error(f"[LAMA] Download FAILED: {e}")
+            raise RuntimeError(f"Failed to download LAMA model: {e}")
         
         # Verify MD5
+        logger.info(f"[LAMA] Verifying MD5 checksum...")
         _md5 = md5sum(cached_file)
         if _md5 != model_md5:
+            logger.error(f"[LAMA] MD5 MISMATCH: got {_md5}, expected {model_md5}")
             os.remove(cached_file)
             raise RuntimeError(f"Model MD5 mismatch: {_md5} != {model_md5}")
-        logger.info(f"LAMA model downloaded, MD5 verified: {_md5}")
+        logger.info(f"[LAMA] MD5 verified: {_md5}")
+    else:
+        file_size_mb = os.path.getsize(cached_file) / (1024 * 1024)
+        logger.info(f"[LAMA] Model already exists: {cached_file} ({file_size_mb:.1f} MB)")
     
     return cached_file
 
@@ -71,28 +87,50 @@ def get_lama_model():
     """Lazy-load LAMA model using IOPaint's big-lama.pt."""
     global _lama_model
     if _lama_model is None:
+        logger.info("[LAMA] ========== INITIALIZING LAMA MODEL ==========")
         try:
             import torch
             
             device = get_device()
-            logger.info(f"Loading LAMA model on {device}")
+            logger.info(f"[LAMA] Selected device: {device}")
+            logger.info(f"[LAMA] PyTorch version: {torch.__version__}")
+            logger.info(f"[LAMA] CUDA available: {torch.cuda.is_available()}")
+            if hasattr(torch.backends, "mps"):
+                logger.info(f"[LAMA] MPS available: {torch.backends.mps.is_available()}")
             
             # Download model if needed
+            logger.info("[LAMA] Checking/downloading model...")
             model_path = download_lama_model(LAMA_MODEL_URL, LAMA_MODEL_MD5)
             
             # Load JIT model (map to CPU first, then move to device)
-            model = torch.jit.load(model_path, map_location="cpu").to(device)
-            model.eval()
+            logger.info(f"[LAMA] Loading JIT model from: {model_path}")
+            logger.info(f"[LAMA] Loading to CPU first, then moving to {device}...")
+            try:
+                model = torch.jit.load(model_path, map_location="cpu")
+                logger.info("[LAMA] JIT model loaded to CPU")
+                model = model.to(device)
+                logger.info(f"[LAMA] Model moved to {device}")
+                model.eval()
+                logger.info("[LAMA] Model set to eval mode")
+            except Exception as load_err:
+                logger.error(f"[LAMA] JIT LOAD FAILED: {load_err}")
+                import traceback
+                logger.error(f"[LAMA] Traceback:\n{traceback.format_exc()}")
+                raise load_err
             
             _lama_model = {
                 "model": model,
                 "device": device,
                 "type": "big-lama"
             }
-            logger.info(f"LAMA model loaded successfully on {device}")
+            logger.info(f"[LAMA] ✅ MODEL LOADED SUCCESSFULLY on {device}")
+            logger.info("[LAMA] ==========================================")
         except Exception as e:
-            logger.warning(f"LAMA model failed to load ({e}), using fallback inpainting")
-            _lama_model = {"fallback": True}
+            logger.error(f"[LAMA] ❌ MODEL LOAD FAILED: {e}")
+            import traceback
+            logger.error(f"[LAMA] Full traceback:\n{traceback.format_exc()}")
+            logger.warning("[LAMA] Falling back to OpenCV inpainting (lower quality)")
+            _lama_model = {"fallback": True, "error": str(e)}
     
     return _lama_model
 
@@ -101,8 +139,13 @@ class WatermarkInpainter:
     """Inpaints (removes) watermarks from video frames using LAMA."""
     
     def __init__(self):
+        logger.info("[Inpainter] Initializing WatermarkInpainter...")
         self.model = get_lama_model()
         self.use_fallback = self.model.get("fallback", False)
+        if self.use_fallback:
+            logger.warning(f"[Inpainter] ⚠️ Using OpenCV fallback (LAMA error: {self.model.get('error', 'unknown')})")
+        else:
+            logger.info(f"[Inpainter] ✅ Using LAMA model ({self.model.get('type', 'unknown')}) on {self.model.get('device', 'unknown')}")
     
     def create_mask(
         self, 

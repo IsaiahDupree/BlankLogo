@@ -44,15 +44,30 @@ def get_yolo_model():
     """Lazy-load YOLO model."""
     global _yolo_model
     if _yolo_model is None:
-        from ultralytics import YOLO
-        
-        weights_path = MODELS_DIR / "watermark_detector.pt"
-        download_weights(YOLO_WEIGHTS_URL, weights_path)
-        
-        logger.info(f"Loading YOLO model from {weights_path}")
-        _yolo_model = YOLO(str(weights_path))
-        _yolo_model.to(get_device())
-        logger.info("YOLO model loaded")
+        logger.info("[YOLO] ========== INITIALIZING YOLO MODEL ==========")
+        try:
+            from ultralytics import YOLO
+            
+            weights_path = MODELS_DIR / "watermark_detector.pt"
+            logger.info(f"[YOLO] Weights path: {weights_path}")
+            logger.info(f"[YOLO] Weights exist: {weights_path.exists()}")
+            
+            download_weights(YOLO_WEIGHTS_URL, weights_path)
+            
+            device = get_device()
+            logger.info(f"[YOLO] Selected device: {device}")
+            logger.info(f"[YOLO] Loading model...")
+            
+            _yolo_model = YOLO(str(weights_path))
+            _yolo_model.to(device)
+            
+            logger.info(f"[YOLO] ✅ MODEL LOADED SUCCESSFULLY on {device}")
+            logger.info("[YOLO] ==========================================")
+        except Exception as e:
+            logger.error(f"[YOLO] ❌ MODEL LOAD FAILED: {e}")
+            import traceback
+            logger.error(f"[YOLO] Traceback:\n{traceback.format_exc()}")
+            raise e
     
     return _yolo_model
 

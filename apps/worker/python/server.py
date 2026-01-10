@@ -55,7 +55,39 @@ async def health_check():
 
 @app.get("/capabilities")
 async def get_capabilities():
-    """Return service capabilities and supported formats."""
+    """Return service capabilities, supported formats, and model status."""
+    import torch
+    
+    # Check device availability
+    cuda_available = torch.cuda.is_available()
+    mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    device = "cuda" if cuda_available else ("mps" if mps_available else "cpu")
+    
+    # Check LAMA model status
+    lama_status = "unknown"
+    lama_model_path = None
+    try:
+        from torch.hub import get_dir
+        import os
+        hub_dir = get_dir()
+        lama_path = os.path.join(hub_dir, "checkpoints", "big-lama.pt")
+        if os.path.exists(lama_path):
+            lama_status = "downloaded"
+            lama_model_path = lama_path
+        else:
+            lama_status = "not_downloaded"
+    except Exception as e:
+        lama_status = f"error: {e}"
+    
+    # Check YOLO model status
+    yolo_status = "unknown"
+    try:
+        from pathlib import Path
+        yolo_path = Path(__file__).parent / "models" / "watermark_detector.pt"
+        yolo_status = "downloaded" if yolo_path.exists() else "not_downloaded"
+    except Exception as e:
+        yolo_status = f"error: {e}"
+    
     return {
         "service": "blanklogo-inpainter",
         "version": "1.0.0",
@@ -69,7 +101,26 @@ async def get_capabilities():
         "features": {
             "async_processing": True,
             "progress_tracking": True,
-            "gpu_acceleration": False,  # Render free tier doesn't have GPU
+            "gpu_acceleration": cuda_available,
+        },
+        "models": {
+            "yolo": {
+                "status": yolo_status,
+                "name": "watermark_detector.pt",
+                "source": "linkedlist771/SoraWatermarkCleaner"
+            },
+            "lama": {
+                "status": lama_status,
+                "name": "big-lama.pt",
+                "source": "Sanster/models (IOPaint)",
+                "path": lama_model_path
+            }
+        },
+        "runtime": {
+            "device": device,
+            "cuda_available": cuda_available,
+            "mps_available": mps_available,
+            "torch_version": torch.__version__
         }
     }
 
@@ -276,19 +327,42 @@ async def cleanup_job(job_id: str):
 @app.on_event("startup")
 async def startup():
     """Startup event - preload models if GPU available."""
+    logger.info("=" * 60)
     logger.info("BlankLogo Inpainting Service starting...")
+    logger.info("=" * 60)
+    
+    # Log environment info
+    import torch
+    logger.info(f"[Startup] PyTorch version: {torch.__version__}")
+    logger.info(f"[Startup] CUDA available: {torch.cuda.is_available()}")
+    if hasattr(torch.backends, "mps"):
+        logger.info(f"[Startup] MPS available: {torch.backends.mps.is_available()}")
+    logger.info(f"[Startup] PRELOAD_MODELS: {os.environ.get('PRELOAD_MODELS', 'false')}")
     
     # Optionally preload models
     if os.environ.get("PRELOAD_MODELS", "false").lower() == "true":
-        logger.info("Preloading models...")
+        logger.info("[Startup] Preloading models (PRELOAD_MODELS=true)...")
         try:
             from detector import get_yolo_model
             from inpainter import get_lama_model
+            
+            logger.info("[Startup] Loading YOLO model...")
             get_yolo_model()
+            
+            logger.info("[Startup] Loading LAMA model...")
             get_lama_model()
-            logger.info("Models preloaded")
+            
+            logger.info("[Startup] ✅ All models preloaded successfully")
         except Exception as e:
-            logger.warning(f"Failed to preload models: {e}")
+            logger.error(f"[Startup] ❌ Failed to preload models: {e}")
+            import traceback
+            logger.error(f"[Startup] Traceback:\n{traceback.format_exc()}")
+    else:
+        logger.info("[Startup] Models will be loaded on first request (PRELOAD_MODELS=false)")
+    
+    logger.info("=" * 60)
+    logger.info("BlankLogo Inpainting Service READY")
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":
