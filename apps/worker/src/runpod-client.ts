@@ -7,7 +7,12 @@
  * - Automatic wake-up on request
  */
 
-import { logger } from './logger';
+// Simple logger for standalone use
+const logger = {
+  info: (...args: any[]) => console.log('[RunPod]', ...args),
+  warn: (...args: any[]) => console.warn('[RunPod]', ...args),
+  error: (...args: any[]) => console.error('[RunPod]', ...args),
+};
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const RUNPOD_POD_ID = process.env.RUNPOD_POD_ID;
