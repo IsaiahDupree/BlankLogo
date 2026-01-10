@@ -1,0 +1,35 @@
+# RunPod Serverless Docker Image
+# Lightweight image that downloads code on cold start
+FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    runpod \
+    ultralytics \
+    loguru \
+    tqdm \
+    ffmpeg-python \
+    "numpy<2" \
+    opencv-python-headless
+
+# Clone BlankLogo and pre-download models
+RUN git clone --depth 1 https://github.com/IsaiahDupree/BlankLogo.git /app/BlankLogo
+
+WORKDIR /app/BlankLogo/apps/worker/python
+
+# Pre-download models to avoid cold start delay
+RUN python3 -c "from detector import get_yolo_model; get_yolo_model()" && \
+    python3 -c "from inpainter import download_lama_model, LAMA_MODEL_URL, LAMA_MODEL_MD5; download_lama_model(LAMA_MODEL_URL, LAMA_MODEL_MD5)"
+
+# Copy handler (overrides the one from git for latest version)
+COPY apps/worker/python/handler.py /app/BlankLogo/apps/worker/python/handler.py
+
+# Start handler
+CMD ["python3", "-u", "handler.py"]
