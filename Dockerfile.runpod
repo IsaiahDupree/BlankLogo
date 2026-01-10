@@ -1,0 +1,40 @@
+# Dockerfile.runpod
+# GPU-accelerated LAMA watermark removal for RunPod Serverless
+FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY apps/worker/python/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install runpod handler
+RUN pip install runpod
+
+# Copy application code
+COPY apps/worker/python/ .
+
+# Download models at build time (faster cold starts)
+RUN echo "Downloading YOLO model..." && \
+    python -c "from detector import get_yolo_model; get_yolo_model()" && \
+    echo "YOLO model downloaded"
+
+RUN echo "Downloading LAMA model..." && \
+    python -c "from inpainter import download_lama_model, LAMA_MODEL_URL, LAMA_MODEL_MD5; download_lama_model(LAMA_MODEL_URL, LAMA_MODEL_MD5)" && \
+    echo "LAMA model downloaded"
+
+# Copy RunPod handler
+COPY apps/worker/python/runpod_handler.py .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "print('healthy')" || exit 1
+
+CMD ["python", "-u", "runpod_handler.py"]
