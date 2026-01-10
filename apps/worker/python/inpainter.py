@@ -1,17 +1,23 @@
 """
 BlankLogo Watermark Inpainter
 Uses LAMA model to inpaint (remove) watermark regions.
-Inspired by SoraWatermarkCleaner and IOPaint.
+Based on IOPaint/SoraWatermarkCleaner implementation.
 """
 import os
+import hashlib
 from pathlib import Path
 from typing import Optional, List
+from urllib.parse import urlparse
 
 import numpy as np
 from loguru import logger
 
 # Lazy imports
 _lama_model = None
+
+# LAMA model from IOPaint (works on CPU/MPS/CUDA)
+LAMA_MODEL_URL = "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt"
+LAMA_MODEL_MD5 = "e3aa4aaa15225a33ec84f9f4bc47e500"
 
 
 def get_device() -> str:
@@ -24,31 +30,68 @@ def get_device() -> str:
     return "cpu"
 
 
+def md5sum(filename: str) -> str:
+    """Calculate MD5 checksum of a file."""
+    md5 = hashlib.md5()
+    with open(filename, "rb") as f:
+        for chunk in iter(lambda: f.read(128 * md5.block_size), b""):
+            md5.update(chunk)
+    return md5.hexdigest()
+
+
+def download_lama_model(url: str, model_md5: str) -> str:
+    """Download LAMA model if not present. Returns path to model."""
+    import torch
+    from torch.hub import download_url_to_file, get_dir
+    
+    # Get cache path
+    parts = urlparse(url)
+    hub_dir = get_dir()
+    model_dir = os.path.join(hub_dir, "checkpoints")
+    os.makedirs(model_dir, exist_ok=True)
+    filename = os.path.basename(parts.path)
+    cached_file = os.path.join(model_dir, filename)
+    
+    # Download if not exists
+    if not os.path.exists(cached_file):
+        logger.info(f"Downloading LAMA model to {cached_file}")
+        download_url_to_file(url, cached_file, None, progress=True)
+        
+        # Verify MD5
+        _md5 = md5sum(cached_file)
+        if _md5 != model_md5:
+            os.remove(cached_file)
+            raise RuntimeError(f"Model MD5 mismatch: {_md5} != {model_md5}")
+        logger.info(f"LAMA model downloaded, MD5 verified: {_md5}")
+    
+    return cached_file
+
+
 def get_lama_model():
-    """Lazy-load LAMA model via simple-lama-inpainting."""
+    """Lazy-load LAMA model using IOPaint's big-lama.pt."""
     global _lama_model
     if _lama_model is None:
         try:
-            from simple_lama_inpainting import SimpleLama
             import torch
             
-            # Determine best device - MPS for Apple Silicon, CPU otherwise
-            if torch.backends.mps.is_available():
-                device = "mps"
-            else:
-                device = "cpu"
-            
+            device = get_device()
             logger.info(f"Loading LAMA model on {device}")
             
-            # SimpleLama needs to be loaded without CUDA tensors
-            with torch.device(device):
-                _lama_model = {
-                    "model": SimpleLama(device=device),
-                    "device": device
-                }
-            logger.info("LAMA model loaded successfully")
+            # Download model if needed
+            model_path = download_lama_model(LAMA_MODEL_URL, LAMA_MODEL_MD5)
+            
+            # Load JIT model (map to CPU first, then move to device)
+            model = torch.jit.load(model_path, map_location="cpu").to(device)
+            model.eval()
+            
+            _lama_model = {
+                "model": model,
+                "device": device,
+                "type": "big-lama"
+            }
+            logger.info(f"LAMA model loaded successfully on {device}")
         except Exception as e:
-            logger.warning(f"simple-lama-inpainting failed ({e}), using fallback inpainting")
+            logger.warning(f"LAMA model failed to load ({e}), using fallback inpainting")
             _lama_model = {"fallback": True}
     
     return _lama_model
@@ -91,13 +134,34 @@ class WatermarkInpainter:
         mask[y1:y2, x1:x2] = 255
         return mask
     
+    def _norm_img(self, img: np.ndarray) -> np.ndarray:
+        """Normalize image to [0, 1] float32 and add channel dim if needed."""
+        if img.dtype == np.uint8:
+            img = img.astype(np.float32) / 255.0
+        if len(img.shape) == 2:
+            img = img[:, :, np.newaxis]
+        if img.shape[2] == 1:
+            img = np.repeat(img, 3, axis=2)
+        return img
+    
+    def _pad_to_mod(self, img: np.ndarray, mod: int = 8) -> tuple:
+        """Pad image to be divisible by mod. Returns (padded_img, original_shape)."""
+        h, w = img.shape[:2]
+        pad_h = (mod - h % mod) % mod
+        pad_w = (mod - w % mod) % mod
+        
+        if pad_h > 0 or pad_w > 0:
+            img = np.pad(img, ((0, pad_h), (0, pad_w), (0, 0)), mode='reflect')
+        
+        return img, (h, w)
+    
     def inpaint_frame(
         self, 
         frame: np.ndarray, 
         mask: np.ndarray
     ) -> np.ndarray:
         """
-        Inpaint a single frame using LAMA.
+        Inpaint a single frame using LAMA (big-lama.pt from IOPaint).
         
         Args:
             frame: BGR image (H, W, 3)
@@ -110,19 +174,42 @@ class WatermarkInpainter:
             return self._fallback_inpaint(frame, mask)
         
         import cv2
-        from PIL import Image
+        import torch
         
-        # simple-lama-inpainting expects PIL Images
+        # Convert BGR to RGB
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img_pil = Image.fromarray(frame_rgb)
-        mask_pil = Image.fromarray(mask)
         
-        # Run inpainting
-        result_pil = self.model["model"](img_pil, mask_pil)
+        # Normalize to [0, 1]
+        image = self._norm_img(frame_rgb)  # [H, W, 3]
+        mask_norm = self._norm_img(mask)    # [H, W, 1] -> [H, W, 3]
+        mask_norm = mask_norm[:, :, 0:1]    # Keep single channel [H, W, 1]
         
-        # Convert back to numpy BGR
-        result_rgb = np.array(result_pil)
-        result_bgr = cv2.cvtColor(result_rgb, cv2.COLOR_RGB2BGR)
+        # Pad to multiple of 8 (LAMA requirement)
+        image_padded, orig_shape = self._pad_to_mod(image, 8)
+        mask_padded, _ = self._pad_to_mod(mask_norm, 8)
+        
+        # Convert to torch tensors [B, C, H, W]
+        device = self.model["device"]
+        mask_binary = (mask_padded > 0).astype(np.float32)
+        
+        image_tensor = torch.from_numpy(image_padded).permute(2, 0, 1).unsqueeze(0).to(device)
+        mask_tensor = torch.from_numpy(mask_binary).permute(2, 0, 1).unsqueeze(0).to(device)
+        
+        # Run LAMA inference
+        with torch.inference_mode():
+            result = self.model["model"](image_tensor, mask_tensor)
+        
+        # Convert back to numpy
+        result_np = result[0].permute(1, 2, 0).cpu().numpy()
+        
+        # Crop to original size
+        h, w = orig_shape
+        result_np = result_np[:h, :w, :]
+        
+        # Convert to uint8 BGR
+        result_np = np.clip(result_np * 255, 0, 255).astype(np.uint8)
+        result_bgr = cv2.cvtColor(result_np, cv2.COLOR_RGB2BGR)
+        
         return result_bgr
     
     def _fallback_inpaint(
