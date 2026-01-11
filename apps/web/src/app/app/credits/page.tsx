@@ -13,6 +13,7 @@ import {
 } from "@/lib/meta-pixel";
 import * as ga from "@/lib/google-analytics";
 import * as ph from "@/lib/posthog";
+import { billing } from "@/lib/posthog-events";
 import { STRIPE_PRICE_IDS } from "@/lib/stripe";
 
 // Logging utility
@@ -63,6 +64,9 @@ export default function CreditsPage() {
       contentCategory: 'pricing',
     });
     
+    // Track paywall viewed for PostHog
+    billing.paywallViewed({ placement: 'credits_page' });
+    
     if (success) {
       toastShownRef.current = true;
       logCredits("✅ Payment success detected");
@@ -79,6 +83,14 @@ export default function CreditsPage() {
         metaPurchase({ packId, packName, price, credits, orderId: searchParams.get("session_id") || undefined });
         ga.trackCreditPurchase({ packId, packName, price, credits, transactionId: searchParams.get("session_id") || undefined });
         ph.trackCreditPurchase({ packId, packName, price, credits, orderId: searchParams.get("session_id") || undefined });
+        // New PostHog billing event
+        billing.checkoutCompleted({ 
+          plan: packId, 
+          price_id: packId, 
+          credits, 
+          amount_cents: Math.round(price * 100),
+          order_id: searchParams.get("session_id") || undefined 
+        });
         logCredits("📊 Purchase tracked (Meta, GA, PostHog)", { packId, price, credits });
       }
       // Clear URL params to prevent toast on refresh
@@ -88,6 +100,8 @@ export default function CreditsPage() {
       toastShownRef.current = true;
       logCredits("⚠️ Payment canceled detected");
       toast.warning("Payment was canceled.");
+      // Track checkout abandoned
+      billing.checkoutAbandoned({ plan: 'unknown', reason: 'user_canceled' });
       // Clear the URL params to prevent toast on refresh
       window.history.replaceState({}, '', '/app/credits');
     }
@@ -151,6 +165,13 @@ export default function CreditsPage() {
       metaStartCheckout({ packId: pack.id, price: pack.price, credits: pack.credits });
       ga.trackBeginCheckout({ items: [{ itemId: pack.id, itemName: `${pack.credits} Credits`, price: pack.price }], value: pack.price });
       ph.trackBeginCheckout({ products: [{ id: pack.id, name: `${pack.credits} Credits`, price: pack.price }], value: pack.price });
+      // New PostHog billing event
+      billing.checkoutStarted({ 
+        plan: pack.id, 
+        price_id: pack.id, 
+        credits: pack.credits, 
+        amount_cents: Math.round(pack.price * 100) 
+      });
       
       logCredits("📊 AddToCart + Checkout tracked (Meta, GA, PostHog)", { packId, price: pack.price });
     }
