@@ -1,8 +1,8 @@
 """
-RunPod Serverless Handler (Lightweight)
+RunPod Serverless Handler
 
-This handler is loaded by RunPod's serverless runtime.
-It downloads the BlankLogo code on cold start, then processes videos.
+Processes videos for watermark removal using YOLO detection and LAMA inpainting.
+Dependencies and models are pre-installed in the Docker image.
 """
 import runpod
 import os
@@ -10,54 +10,31 @@ import sys
 import base64
 import tempfile
 import time
-import subprocess
 
-# Install dependencies on cold start
-def install_dependencies():
-    """Install required packages."""
-    print("[Handler] Installing dependencies...")
-    subprocess.run([
-        sys.executable, "-m", "pip", "install", "-q",
-        "ultralytics", "loguru", "tqdm", "ffmpeg-python", 
-        "numpy<2", "opencv-python-headless"
-    ], check=True)
-    print("[Handler] Dependencies installed")
+print("[Handler] Starting up...")
 
-# Clone repo on cold start  
-def setup_code():
-    """Clone BlankLogo repo if not present."""
-    code_path = "/tmp/BlankLogo"
-    if not os.path.exists(code_path):
-        print("[Handler] Cloning BlankLogo repo...")
-        subprocess.run([
-            "git", "clone", "--depth", "1",
-            "https://github.com/IsaiahDupree/BlankLogo.git",
-            code_path
-        ], check=True)
+# Import modules (already installed in Docker image)
+try:
+    from processor import VideoProcessor, ProcessingMode
+    from loguru import logger
+    from detector import get_yolo_model
+    from inpainter import get_lama_model
     
-    # Add to path
-    worker_path = os.path.join(code_path, "apps/worker/python")
-    if worker_path not in sys.path:
-        sys.path.insert(0, worker_path)
-    
-    return worker_path
-
-# Initialize on cold start
-print("[Handler] Cold start - initializing...")
-install_dependencies()
-code_path = setup_code()
-os.chdir(code_path)
-
-# Now import our modules
-from processor import VideoProcessor, ProcessingMode
-from loguru import logger
-
-print("[Handler] Preloading models...")
-from detector import get_yolo_model
-from inpainter import get_lama_model
-get_yolo_model()
-get_lama_model()
-print("[Handler] Models loaded - ready for requests!")
+    print("[Handler] Loading models...")
+    get_yolo_model()
+    get_lama_model()
+    print("[Handler] Models loaded - ready for requests!")
+except Exception as e:
+    print(f"[Handler] Import error: {e}")
+    # Fallback: try to import from expected Docker path
+    sys.path.insert(0, "/app/BlankLogo/apps/worker/python")
+    from processor import VideoProcessor, ProcessingMode
+    from loguru import logger
+    from detector import get_yolo_model
+    from inpainter import get_lama_model
+    get_yolo_model()
+    get_lama_model()
+    print("[Handler] Models loaded (fallback path)")
 
 
 def handler(event):

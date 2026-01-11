@@ -50,3 +50,5 @@ yarn-error.log*
 # Remotion
 packages/remotion/out/
 .vercel
+.env.runpod
+.env.runpod
