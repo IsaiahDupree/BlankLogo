@@ -188,7 +188,6 @@ export default async function JobsPage() {
                         href={job.output_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-xs sm:text-sm hover:bg-green-500/30 transition"
                       >
                         <Download className="w-4 h-4" />
