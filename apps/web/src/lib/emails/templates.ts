@@ -13,7 +13,7 @@ export function getWelcomeEmail(userName?: string): EmailTemplate {
   const name = userName || "there";
   
   return {
-    subject: "Welcome to BlankLogo! 🎉 Your 5 free credits are ready",
+    subject: "Welcome to BlankLogo! 🎉 Your 10 free credits are ready",
     html: `
 <!DOCTYPE html>
 <html>
@@ -35,12 +35,12 @@ export function getWelcomeEmail(userName?: string): EmailTemplate {
         Hey ${name}! 👋
       </p>
       <p style="color: #94a3b8; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-        Thanks for signing up! You now have <strong style="color: #22c55e;">5 free credits</strong> to remove watermarks from your AI-generated videos.
+        Thanks for signing up! You now have <strong style="color: #22c55e;">10 free credits</strong> to remove watermarks from your AI-generated videos.
       </p>
       
       <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <p style="color: #22c55e; font-size: 14px; font-weight: 600; margin: 0 0 8px 0;">YOUR FREE CREDITS</p>
-        <p style="color: white; font-size: 32px; font-weight: bold; margin: 0;">5 Videos</p>
+        <p style="color: white; font-size: 32px; font-weight: bold; margin: 0;">10 Videos</p>
         <p style="color: #94a3b8; font-size: 14px; margin: 8px 0 0 0;">No credit card required • Never expires</p>
       </div>
       
@@ -81,7 +81,7 @@ Welcome to BlankLogo! 🎉
 
 Hey ${name}!
 
-Thanks for signing up! You now have 5 FREE CREDITS to remove watermarks from your AI-generated videos.
+Thanks for signing up! You now have 10 FREE CREDITS to remove watermarks from your AI-generated videos.
 
 No credit card required. Credits never expire.
 
