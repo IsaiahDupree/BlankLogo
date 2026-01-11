@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Clock, CheckCircle, XCircle, Loader2, Video, Download, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { VideoThumbnail } from "@/components/video-thumbnail";
 
 // Server-side logging
 function logJobs(message: string, data?: unknown) {
@@ -129,30 +130,56 @@ export default async function JobsPage() {
           </div>
           <div className="grid gap-4">
             {jobs.map((job: BlJob) => (
-              <Link
+              <div
                 key={job.id}
-                href={`/app/jobs/${job.id}`}
                 className="block p-4 rounded-xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-white/[0.07] transition cursor-pointer group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold mb-1 group-hover:text-indigo-300 transition">
+                <Link href={`/app/jobs/${job.id}`} className="flex items-center gap-4">
+                  {/* Thumbnail */}
+                  <div className="flex-shrink-0">
+                    {job.status === "completed" && job.output_url ? (
+                      <VideoThumbnail 
+                        src={job.output_url} 
+                        alt={job.input_filename || 'Video thumbnail'}
+                        className="w-24 h-16 sm:w-32 sm:h-20"
+                      />
+                    ) : (
+                      <div className="w-24 h-16 sm:w-32 sm:h-20 rounded-lg bg-gray-800 flex items-center justify-center">
+                        {job.status === "processing" ? (
+                          <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                        ) : job.status === "failed" ? (
+                          <XCircle className="w-6 h-6 text-red-400" />
+                        ) : (
+                          <Video className="w-6 h-6 text-gray-600" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Job Info */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold mb-1 group-hover:text-indigo-300 transition truncate">
                       {job.input_filename || `Job ${job.id.slice(0, 8)}`}
                     </h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-400">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-gray-400">
                       <span className="capitalize px-2 py-0.5 rounded bg-white/5">
                         {job.platform === "auto" ? "Auto-Detect" : job.platform}
                       </span>
-                      <span>
+                      <span className="hidden sm:inline">
                         {new Date(job.created_at).toLocaleDateString()} at{" "}
                         {new Date(job.created_at).toLocaleTimeString()}
                       </span>
+                      <span className="sm:hidden text-xs">
+                        {new Date(job.created_at).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className={`flex items-center gap-2 ${getStatusColor(job.status)}`}>
+                  
+                  {/* Status & Actions */}
+                  <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                    <div className={`flex items-center gap-1 sm:gap-2 ${getStatusColor(job.status)}`}>
                       {getStatusIcon(job.status)}
-                      <span className="text-sm font-medium">
+                      <span className="text-xs sm:text-sm font-medium hidden sm:inline">
                         {getStatusLabel(job.status)}
                       </span>
                     </div>
@@ -161,21 +188,17 @@ export default async function JobsPage() {
                         href={job.output_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-sm hover:bg-green-500/30 transition z-10"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-xs sm:text-sm hover:bg-green-500/30 transition"
                       >
                         <Download className="w-4 h-4" />
-                        Download
+                        <span className="hidden sm:inline">Download</span>
                       </a>
                     )}
-                    {job.status === "failed" && job.error_message && (
-                      <span className="text-xs text-red-400 max-w-[200px] truncate">
-                        {job.error_message}
-                      </span>
-                    )}
-                    <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-indigo-400 transition" />
+                    <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-indigo-400 transition hidden sm:block" />
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         </div>
