@@ -4,8 +4,12 @@
  * Calls Modal serverless GPU for watermark removal using YOLO + LAMA
  */
 
-const MODAL_TOKEN_ID = process.env.MODAL_TOKEN_ID || "ak-pszSr5MyUohfmdbcBohF3w";
-const MODAL_TOKEN_SECRET = process.env.MODAL_TOKEN_SECRET || "as-Ksu1Q3n2XXVXWjoZKX16dn";
+const MODAL_TOKEN_ID = process.env.MODAL_TOKEN_ID;
+const MODAL_TOKEN_SECRET = process.env.MODAL_TOKEN_SECRET;
+
+if (!MODAL_TOKEN_ID || !MODAL_TOKEN_SECRET) {
+  console.warn("[Modal] ⚠️ MODAL_TOKEN_ID and MODAL_TOKEN_SECRET not set - GPU processing will fail");
+}
 const MODAL_APP_NAME = "blanklogo-watermark-removal";
 const MODAL_WORKSPACE = "isaiahdupree33";
 
