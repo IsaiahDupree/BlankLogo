@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback, ReactNode } from 'react';
 import { Gift, Sparkles, X, PartyPopper } from 'lucide-react';
 
 interface CreditsCelebrationProps {
@@ -112,7 +112,6 @@ export function CreditsCelebration({ credits, reason = 'Welcome bonus', onClose 
 }
 
 // Hook for managing celebration state
-import { createContext, useContext, useCallback, ReactNode } from 'react';
 
 interface CelebrationContextType {
   showCelebration: (credits: number, reason?: string) => void;
