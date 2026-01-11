@@ -192,9 +192,12 @@ export default function PricingPage() {
           <h1 className="text-4xl md:text-5xl font-bold mb-6">
             Simple, Credit-Based Pricing
           </h1>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-4">
             Pay only for what you use. 1 credit = 1 video processed. 
             Choose a monthly plan or buy credits as needed.
+          </p>
+          <p className="text-indigo-400 font-medium">
+            Start with 10 free credits (one-time). No credit card required.
           </p>
         </div>
       </section>
@@ -273,7 +276,7 @@ export default function PricingPage() {
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl font-bold mb-8 text-center">Top-Up Packs</h2>
           <p className="text-center text-gray-400 mb-8">
-            One-time purchases. Credits never expire.
+            Need credits without a monthly plan? Grab a pack. Credits never expire.
           </p>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
             {CREDIT_PACKS.map((pack) => (
@@ -318,7 +321,7 @@ export default function PricingPage() {
           <div className="space-y-6">
             <FAQItem
               question="How do credits work?"
-              answer="1 credit = 1 video processed for watermark removal. Credits never expire."
+              answer="1 credit = 1 video processed. Monthly plans add credits every month. Top-up credits never expire. New accounts start with 10 free credits (one-time)."
             />
             <FAQItem
               question="What platforms are supported?"
@@ -345,7 +348,7 @@ export default function PricingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Remove Watermarks?</h2>
           <p className="text-gray-400 mb-8">
-            Start removing watermarks from your AI-generated videos in seconds.
+            Start with 10 free credits (one-time) and process your first videos today.
           </p>
           <Link
             href="/signup"

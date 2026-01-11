@@ -61,17 +61,22 @@ export default function Home() {
       <section className="container mx-auto px-6 py-24 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm mb-6">
           <Zap className="w-4 h-4" />
-          <span>Remove Watermarks Instantly</span>
+          <span>Ad-Free Premium Tool</span>
         </div>
         
         <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-          Clean AI Videos<br />In Seconds
+          Remove Watermarks<br />Fast, Clean, Ad-Free
         </h1>
         
-        <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-          Remove watermarks from Sora, TikTok, Runway, Pika, and other AI-generated videos.
-          Fast processing, original quality, no re-encoding.
+        <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
+          Upload a video (or paste a link). BlankLogo detects the platform watermark and delivers a clean export — no re-encoding, no quality loss.
         </p>
+        
+        <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-300 mb-10">
+          <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-indigo-400" /> 5-15s processing</span>
+          <span className="flex items-center gap-2"><Video className="w-4 h-4 text-indigo-400" /> Quality preserved</span>
+          <span className="flex items-center gap-2"><Shield className="w-4 h-4 text-indigo-400" /> Ad-free experience</span>
+        </div>
         
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
@@ -171,7 +176,7 @@ export default function Home() {
                 {platform.name}
               </h3>
               <p className="text-gray-400 text-sm mb-3">{platform.desc}</p>
-              <span className="text-xs text-gray-500">Default crop: {platform.pixels}px</span>
+              <span className="text-xs text-gray-500">Remove {platform.name} watermark fast</span>
             </Link>
           ))}
         </div>
@@ -180,17 +185,17 @@ export default function Home() {
       {/* Features */}
       <section className="container mx-auto px-6 py-24 border-t border-white/10">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-          Why Choose BlankLogo
+          Why Creators Choose BlankLogo
         </h2>
         
         <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           <div className="text-center p-6">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-              <Clock className="w-8 h-8 text-indigo-400" />
+              <Zap className="w-8 h-8 text-indigo-400" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Lightning Fast</h3>
+            <h3 className="text-xl font-semibold mb-2">Ad-Free Premium</h3>
             <p className="text-gray-400">
-              Process videos in 5-15 seconds. No waiting, no queues for small files.
+              No popups, no "wait timers," no sketchy redirects. Just upload and go.
             </p>
           </div>
           
@@ -223,7 +228,7 @@ export default function Home() {
             Ready to Clean Your Videos?
           </h2>
           <p className="text-xl text-white/80 mb-8">
-            Start with 10 free videos. No credit card required.
+            10 free credits (one-time). No credit card required.
           </p>
           <Link
             href="/app"
