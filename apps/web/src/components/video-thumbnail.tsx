@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Play, Film } from 'lucide-react';
 
 interface VideoThumbnailProps {
@@ -13,9 +13,16 @@ export function VideoThumbnail({ src, alt = 'Video thumbnail', className = '' }:
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Only run on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
+    if (!mounted) return;
+    
     if (!src) {
       setLoading(false);
       setError(true);
@@ -60,9 +67,10 @@ export function VideoThumbnail({ src, alt = 'Video thumbnail', className = '' }:
     return () => {
       video.src = '';
     };
-  }, [src]);
+  }, [src, mounted]);
 
-  if (loading) {
+  // Show loading state before mount and while loading
+  if (!mounted || loading) {
     return (
       <div className={`flex items-center justify-center bg-gray-800 rounded-lg ${className}`}>
         <div className="animate-pulse">
