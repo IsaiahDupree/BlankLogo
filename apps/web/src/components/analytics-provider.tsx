@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { initGA, trackPageView as gaPageView } from '@/lib/google-analytics';
 import { initPostHog, trackPageView as phPageView } from '@/lib/posthog';
+import { initPostHog as initPostHogEvents } from '@/lib/posthog-events';
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
