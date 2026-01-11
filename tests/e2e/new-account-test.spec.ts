@@ -1,131 +1,170 @@
 /**
  * New Account Creation Test
- * Tests signup and login with a fresh account
+ * Tests signup, login, and signout with a fresh account
+ * Captures all frontend errors
  */
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'https://www.blanklogo.app';
-const NEW_EMAIL = 'lcreator34@gmail.com';
+const BASE_EMAIL = process.env.TEST_NEW_EMAIL || 'lcreator34@gmail.com';
 const PASSWORD = 'Frogger12';
 
-test.describe('New Account Flow', () => {
-  test('1. Sign up with new email', async ({ page }) => {
-    console.log(`[SIGNUP] Testing with email: ${NEW_EMAIL}`);
+// Generate unique email for each test run
+function generateTestEmail(): string {
+  const timestamp = Date.now();
+  const [localPart, domain] = BASE_EMAIL.split('@');
+  return `${localPart}+test${timestamp}@${domain}`;
+}
+
+// Helper to capture any error on the page
+async function captureError(page: any): Promise<string | null> {
+  const errorSelectors = [
+    '.bg-red-500',
+    '[class*="error"]',
+    '[role="alert"]',
+    '.text-red-500'
+  ];
+  
+  for (const selector of errorSelectors) {
+    const el = page.locator(selector).first();
+    if (await el.isVisible().catch(() => false)) {
+      return await el.textContent().catch(() => 'Unknown error');
+    }
+  }
+  return null;
+}
+
+test.describe('Full Auth Flow Test', () => {
+  const testEmail = generateTestEmail();
+  
+  test('1. SIGNUP - Create new account', async ({ page }) => {
+    console.log('━'.repeat(50));
+    console.log(`[SIGNUP] Email: ${testEmail}`);
+    console.log('━'.repeat(50));
     
     await page.goto(`${BASE_URL}/signup`);
-    console.log('[SIGNUP] Page loaded');
     
-    // Fill form
-    await page.locator('input#email').fill(NEW_EMAIL);
+    // Fill and submit
+    await page.locator('input#email').fill(testEmail);
     await page.locator('input#password').fill(PASSWORD);
-    console.log('[SIGNUP] Form filled');
-    
-    // Submit
     await page.locator('button[type="submit"]').click();
-    console.log('[SIGNUP] Form submitted, waiting for response...');
     
-    // Wait for result
+    // Wait for response
     await page.waitForTimeout(5000);
     
-    // Check what happened
+    // Capture result - check specifically for database error
     const url = page.url();
-    console.log(`[SIGNUP] Current URL: ${url}`);
+    const hasDatabaseError = await page.getByText(/database error/i).isVisible().catch(() => false);
+    const hasSuccess = await page.getByText(/check your email|confirmation|sent a confirmation/i).isVisible().catch(() => false);
+    const generalError = await captureError(page);
     
-    // Look for success or error
-    const hasSuccess = await page.getByText(/check your email|confirmation/i).isVisible().catch(() => false);
-    const hasError = await page.locator('.bg-red-500').isVisible().catch(() => false);
+    console.log(`[SIGNUP] URL: ${url}`);
     
-    if (hasSuccess) {
-      console.log('[SIGNUP] ✅ SUCCESS - Check email for confirmation link');
-    } else if (hasError) {
-      const errorText = await page.locator('.bg-red-500').textContent().catch(() => 'Unknown error');
-      console.log(`[SIGNUP] ❌ Error: ${errorText}`);
-      
-      // If already registered, that's OK - we can proceed to login
-      if (errorText?.includes('already') || errorText?.includes('registered')) {
-        console.log('[SIGNUP] Account already exists - will test login instead');
-      }
+    if (hasDatabaseError) {
+      const errorText = await page.locator('.bg-red-500, .text-red-500').first().textContent().catch(() => 'Database error');
+      console.log(`[SIGNUP] ❌ DATABASE ERROR: ${errorText}`);
+      await page.screenshot({ path: 'test-results/1-signup-error.png' });
+      throw new Error(`Signup failed: ${errorText}`);
+    } else if (generalError) {
+      console.log(`[SIGNUP] ❌ ERROR: ${generalError}`);
+      await page.screenshot({ path: 'test-results/1-signup-error.png' });
+      throw new Error(`Signup failed: ${generalError}`);
+    } else if (hasSuccess) {
+      console.log('[SIGNUP] ✅ SUCCESS - Confirmation email sent');
     } else {
-      console.log('[SIGNUP] No clear success/error - checking page state');
+      console.log('[SIGNUP] ⚠️ No clear result - checking page');
     }
     
-    await page.screenshot({ path: 'test-results/new-account-signup.png' });
+    await page.screenshot({ path: 'test-results/1-signup-result.png' });
   });
 
-  test('2. Login with new account', async ({ page }) => {
-    console.log(`[LOGIN] Testing login with: ${NEW_EMAIL}`);
+  test('2. LOGIN - With existing account', async ({ page }) => {
+    // Use known working account for login test
+    const loginEmail = 'isaiahdupree33@gmail.com';
+    const loginPassword = 'Frogger12';
+    
+    console.log('━'.repeat(50));
+    console.log(`[LOGIN] Email: ${loginEmail}`);
+    console.log('━'.repeat(50));
     
     await page.goto(`${BASE_URL}/login`);
-    console.log('[LOGIN] Page loaded');
     
-    // Fill form
-    await page.locator('input#email').fill(NEW_EMAIL);
-    await page.locator('input#password').fill(PASSWORD);
-    console.log('[LOGIN] Form filled');
-    
-    // Submit
+    // Fill and submit
+    await page.locator('input#email').fill(loginEmail);
+    await page.locator('input#password').fill(loginPassword);
     await page.locator('button[type="submit"]').click();
-    console.log('[LOGIN] Form submitted, waiting...');
     
     // Wait for redirect or error
     await page.waitForTimeout(5000);
     
+    const error = await captureError(page);
     const url = page.url();
-    console.log(`[LOGIN] Current URL: ${url}`);
     
-    if (url.includes('/app')) {
-      console.log('[LOGIN] ✅ SUCCESS - Logged in and redirected to app!');
-      
-      // Check if we can see dashboard
-      const hasDashboard = await page.getByText(/dashboard|remove watermark/i).isVisible().catch(() => false);
-      console.log(`[LOGIN] Dashboard visible: ${hasDashboard}`);
+    console.log(`[LOGIN] URL: ${url}`);
+    if (error) {
+      console.log(`[LOGIN] ❌ ERROR: ${error}`);
+      await page.screenshot({ path: 'test-results/2-login-error.png' });
+      throw new Error(`Login failed: ${error}`);
+    } else if (url.includes('/app')) {
+      console.log('[LOGIN] ✅ SUCCESS - Redirected to app');
     } else {
-      const hasError = await page.locator('.bg-red-500').isVisible().catch(() => false);
-      if (hasError) {
-        const errorText = await page.locator('.bg-red-500').textContent();
-        console.log(`[LOGIN] ❌ Error: ${errorText}`);
-        
-        if (errorText?.includes('confirm') || errorText?.includes('verify')) {
-          console.log('[LOGIN] Need to confirm email first');
-        }
-      }
+      console.log('[LOGIN] ⚠️ Did not redirect to /app');
     }
     
-    await page.screenshot({ path: 'test-results/new-account-login.png' });
+    await page.screenshot({ path: 'test-results/2-login-result.png' });
+    expect(url).toContain('/app');
   });
 
-  test('3. Access app after login', async ({ page }) => {
-    console.log('[APP] Testing app access');
-    
+  test('3. SIGNOUT - Sign out from app', async ({ page }) => {
     // Login first
+    const loginEmail = 'isaiahdupree33@gmail.com';
+    const loginPassword = 'Frogger12';
+    
+    console.log('━'.repeat(50));
+    console.log('[SIGNOUT] Testing sign out flow');
+    console.log('━'.repeat(50));
+    
+    // Login
     await page.goto(`${BASE_URL}/login`);
-    await page.locator('input#email').fill(NEW_EMAIL);
-    await page.locator('input#password').fill(PASSWORD);
+    await page.locator('input#email').fill(loginEmail);
+    await page.locator('input#password').fill(loginPassword);
     await page.locator('button[type="submit"]').click();
     
-    // Wait for redirect
-    await page.waitForURL(/\/app/, { timeout: 15000 }).catch(() => {
-      console.log('[APP] Did not redirect to /app');
-    });
+    // Wait for app
+    await page.waitForURL(/\/app/, { timeout: 15000 }).catch(() => {});
+    console.log(`[SIGNOUT] Logged in, URL: ${page.url()}`);
     
-    const url = page.url();
-    console.log(`[APP] Current URL: ${url}`);
-    
-    if (url.includes('/app')) {
-      console.log('[APP] ✅ In app!');
-      
-      // Check credits
-      const creditsVisible = await page.getByText(/credits/i).isVisible().catch(() => false);
-      console.log(`[APP] Credits visible: ${creditsVisible}`);
-      
-      // Try to navigate to remove page
-      await page.goto(`${BASE_URL}/app/remove`);
-      await page.waitForTimeout(2000);
-      
-      const removePageLoaded = await page.getByText(/remove watermark|upload/i).isVisible().catch(() => false);
-      console.log(`[APP] Remove page loaded: ${removePageLoaded}`);
+    if (!page.url().includes('/app')) {
+      console.log('[SIGNOUT] ❌ Could not log in first');
+      await page.screenshot({ path: 'test-results/3-signout-login-failed.png' });
+      throw new Error('Login failed before signout test');
     }
     
-    await page.screenshot({ path: 'test-results/new-account-app.png' });
+    // Sign out by navigating directly to signout route
+    console.log('[SIGNOUT] Navigating to /auth/signout...');
+    await page.goto(`${BASE_URL}/auth/signout`);
+    console.log('[SIGNOUT] Signout route called');
+    
+    // Wait for redirect
+    await page.waitForTimeout(3000);
+    
+    const url = page.url();
+    console.log(`[SIGNOUT] URL after signout: ${url}`);
+    
+    // Check for errors
+    const pageContent = await page.content();
+    if (pageContent.includes('isn\'t working') || pageContent.includes('405') || pageContent.includes('ERROR')) {
+      console.log('[SIGNOUT] ❌ ERROR: Page shows error');
+      await page.screenshot({ path: 'test-results/3-signout-error.png' });
+      throw new Error('Signout resulted in error page');
+    }
+    
+    if (url.includes('/login') || url === `${BASE_URL}/` || url === `${BASE_URL}`) {
+      console.log('[SIGNOUT] ✅ SUCCESS - Signed out and redirected');
+    } else {
+      console.log(`[SIGNOUT] ⚠️ Unexpected URL: ${url}`);
+    }
+    
+    await page.screenshot({ path: 'test-results/3-signout-result.png' });
   });
 });
