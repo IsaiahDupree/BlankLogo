@@ -69,7 +69,7 @@ export default function Home() {
         </h1>
         
         <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-          Upload a video (or paste a link). BlankLogo detects the platform watermark and delivers a clean export — no re-encoding, no quality loss.
+          Upload a video (or paste a link). BlankLogo detects the platform watermark and delivers a clean export - no re-encoding, no quality loss.
         </p>
         
         <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-300 mb-10">

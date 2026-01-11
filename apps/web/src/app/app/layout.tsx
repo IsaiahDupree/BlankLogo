@@ -7,9 +7,18 @@ import { MobileNav } from "@/components/MobileNav";
 import { PromoRedeemer } from "@/components/promo-redeemer";
 
 async function getUser() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error("[APP LAYOUT] Error getting user:", error);
+      return null;
+    }
+    return user;
+  } catch (e) {
+    console.error("[APP LAYOUT] Exception getting user:", e);
+    return null;
+  }
 }
 
 async function getCredits(userId: string) {
