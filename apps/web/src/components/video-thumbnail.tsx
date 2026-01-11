@@ -7,13 +7,15 @@ interface VideoThumbnailProps {
   src: string;
   alt?: string;
   className?: string;
+  preserveAspectRatio?: boolean; // If true, uses object-contain for vertical videos
 }
 
-export function VideoThumbnail({ src, alt = 'Video thumbnail', className = '' }: VideoThumbnailProps) {
+export function VideoThumbnail({ src, alt = 'Video thumbnail', className = '', preserveAspectRatio = false }: VideoThumbnailProps) {
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isVertical, setIsVertical] = useState(false);
 
   // Only run on client
   useEffect(() => {
@@ -43,6 +45,11 @@ export function VideoThumbnail({ src, alt = 'Video thumbnail', className = '' }:
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+        
+        // Detect if video is vertical (portrait orientation)
+        const aspectRatio = video.videoWidth / video.videoHeight;
+        setIsVertical(aspectRatio < 1);
+        
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -88,15 +95,18 @@ export function VideoThumbnail({ src, alt = 'Video thumbnail', className = '' }:
     );
   }
 
+  // Use object-contain for vertical videos to show full frame, object-cover for horizontal
+  const objectFit = (preserveAspectRatio || isVertical) ? 'object-contain' : 'object-cover';
+  
   return (
-    <div className={`relative overflow-hidden rounded-lg ${className}`}>
+    <div className={`relative overflow-hidden rounded-lg bg-gray-800 ${className}`}>
       <img 
         src={thumbnail} 
         alt={alt}
-        className="w-full h-full object-cover"
+        className={`w-full h-full ${objectFit}`}
       />
       <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-        <Play className="w-8 h-8 text-white" />
+        <Play className="w-6 h-6 text-white" />
       </div>
     </div>
   );

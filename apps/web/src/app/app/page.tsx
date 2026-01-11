@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Clock, CheckCircle, XCircle, Loader2, Video, RefreshCw, AlertCircle } from "lucide-react";
+import { Plus, Clock, CheckCircle, XCircle, Loader2, Video, RefreshCw, AlertCircle, Film } from "lucide-react";
+import { VideoThumbnail } from "@/components/video-thumbnail";
 import { createBrowserClient } from "@supabase/ssr";
 
 interface BlJob {
@@ -10,12 +11,18 @@ interface BlJob {
   status: string;
   platform: string;
   input_filename: string;
+  input_url: string | null;
   output_url: string | null;
   created_at: string;
   completed_at: string | null;
   progress?: number;
   current_stage?: string;
-  error_message?: string; // From job processing
+  error_message?: string;
+  metadata?: {
+    width?: number;
+    height?: number;
+    isVertical?: boolean;
+  };
 }
 
 // Progress stages with labels
@@ -210,8 +217,22 @@ export default function DashboardPage() {
               <Link
                 key={job.id}
                 href={`/app/jobs/${job.id}`}
-                className="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 group"
+                className="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex flex-row items-center gap-3 sm:gap-4 group"
               >
+                {/* Video Thumbnail */}
+                <div className="flex-shrink-0">
+                  {job.input_url ? (
+                    <VideoThumbnail
+                      src={job.input_url}
+                      alt={job.input_filename || 'Video thumbnail'}
+                      className="w-16 h-16 sm:w-20 sm:h-20"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center bg-gray-800 rounded-lg">
+                      <Film className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600" />
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold mb-1 truncate group-hover:text-blue-400 transition text-sm sm:text-base">
                     {job.input_filename || `Job ${job.id.slice(0, 8)}`}
