@@ -131,12 +131,90 @@ class WatermarkRemover:
         }
 
 
-# Web endpoint for easy testing
+# Web endpoint for health check
 @app.function(image=image)
 @modal.web_endpoint(method="GET")
 def health():
     """Health check endpoint."""
     return {"status": "ok", "service": "blanklogo-watermark-removal"}
+
+
+# Web endpoint for video processing (called by Render worker)
+@app.function(image=image, gpu=gpu_config, timeout=600, container_idle_timeout=60)
+@modal.web_endpoint(method="POST")
+def process_video_http(request: dict):
+    """
+    HTTP endpoint for video processing.
+    
+    Request body:
+        video_bytes: base64-encoded video
+        mode: "inpaint" | "crop" | "auto"
+        platform: "sora" | "tiktok" | "runway"
+    
+    Response:
+        video_bytes: base64-encoded processed video
+        stats: processing statistics
+    """
+    import sys
+    import base64
+    import tempfile
+    import time
+    
+    sys.path.insert(0, "/app/BlankLogo/apps/worker/python")
+    from processor import VideoProcessor, ProcessingMode
+    from detector import get_yolo_model
+    from inpainter import get_lama_model
+    from loguru import logger
+    
+    # Load models
+    logger.info("[Modal HTTP] Loading models...")
+    get_yolo_model()
+    get_lama_model()
+    
+    # Parse request
+    video_b64 = request.get("video_bytes", "")
+    mode = request.get("mode", "inpaint")
+    platform = request.get("platform", "sora")
+    
+    video_bytes = base64.b64decode(video_b64)
+    
+    start_time = time.time()
+    logger.info(f"[Modal HTTP] Processing: mode={mode}, platform={platform}")
+    logger.info(f"[Modal HTTP] Input size: {len(video_bytes) / 1024 / 1024:.2f} MB")
+    
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        input_path = f"{tmp_dir}/input.mp4"
+        output_path = f"{tmp_dir}/output.mp4"
+        
+        # Write input video
+        with open(input_path, "wb") as f:
+            f.write(video_bytes)
+        
+        # Process video
+        processor = VideoProcessor(mode=ProcessingMode(mode))
+        result = processor.process(input_path, output_path)
+        
+        # Read output video
+        with open(output_path, "rb") as f:
+            output_bytes = f.read()
+        
+        total_time = time.time() - start_time
+        
+        logger.info(f"[Modal HTTP] Output: {len(output_bytes) / 1024 / 1024:.2f} MB")
+        logger.info(f"[Modal HTTP] Time: {total_time:.2f}s")
+        
+        return {
+            "video_bytes": base64.b64encode(output_bytes).decode("utf-8"),
+            "stats": {
+                "mode": mode,
+                "platform": platform,
+                "input_size_mb": round(len(video_bytes) / 1024 / 1024, 2),
+                "output_size_mb": round(len(output_bytes) / 1024 / 1024, 2),
+                "frames_processed": result.get("frames_processed", 0),
+                "watermarks_detected": result.get("watermarks_detected", 0),
+                "processing_time_s": round(total_time, 2),
+            }
+        }
 
 
 # Local testing

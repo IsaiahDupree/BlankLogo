@@ -9,6 +9,7 @@ import * as os from "os";
 import * as http from "http";
 import { downloadVideo, checkCapabilities } from "./download.js";
 import { notifyJobStarted, notifyJobCompleted, notifyJobFailed, notifyCreditsLow } from "./userNotify.js";
+import { processVideoWithModal, checkModalHealth } from "./modal-client.js";
 
 const WORKER_ID = process.env.WORKER_ID ?? `worker-${Math.random().toString(16).slice(2, 10)}`;
 const SERVICE_NAME = 'worker';
@@ -951,39 +952,29 @@ async function removeWatermarkInpaint(
   inputPath: string,
   outputPath: string,
   cropPixels: number,
-  cropPosition: string
+  cropPosition: string,
+  platform: string = "sora"
 ): Promise<{ mode: string; watermarksDetected?: number }> {
-  console.log(`[Worker] Using inpainting mode (YOLO + LAMA)`);
+  console.log(`[Worker] 🚀 Using Modal GPU (YOLO + LAMA)`);
   
   // Read input file
   const fileBuffer = fs.readFileSync(inputPath);
-  const blob = new Blob([fileBuffer], { type: "video/mp4" });
   
-  // Create form data
-  const formData = new FormData();
-  formData.append("video", blob, "input.mp4");
-  formData.append("mode", "inpaint");
-  formData.append("crop_pixels", cropPixels.toString());
-  formData.append("crop_position", cropPosition);
+  // Call Modal GPU
+  const result = await processVideoWithModal(fileBuffer, "inpaint", platform);
   
-  // Call inpainting service
-  const response = await fetch(`${INPAINT_SERVICE_URL}/process`, {
-    method: "POST",
-    body: formData,
-  });
+  // Save output to file
+  fs.writeFileSync(outputPath, result.outputBytes);
   
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Inpainting service error: ${response.status} - ${errorText}`);
-  }
+  console.log(`[Worker] ✅ Modal GPU processing complete`);
+  console.log(`[Worker]    Watermarks detected: ${result.stats.watermarks_detected}`);
+  console.log(`[Worker]    Frames processed: ${result.stats.frames_processed}`);
+  console.log(`[Worker]    GPU time: ${result.stats.processing_time_s}s`);
   
-  // Save response to output file
-  const outputBuffer = await response.arrayBuffer();
-  fs.writeFileSync(outputPath, Buffer.from(outputBuffer));
-  
-  console.log(`[Worker] Inpainting complete`);
-  
-  return { mode: "inpaint" };
+  return { 
+    mode: "inpaint", 
+    watermarksDetected: result.stats.watermarks_detected 
+  };
 }
 
 async function removeWatermark(
@@ -992,25 +983,14 @@ async function removeWatermark(
   cropPixels: number,
   cropPosition: string,
   videoInfo: VideoInfo,
-  processingMode: ProcessingMode = "crop"
+  processingMode: ProcessingMode = "inpaint",
+  platform: string = "sora"
 ): Promise<{ mode: string; watermarksDetected?: number }> {
-  // Use crop mode by default for local dev, or when explicitly requested
-  if (processingMode === "crop") {
-    console.log(`[Worker] ✂️ Using FFmpeg crop mode`);
-    return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
-  }
+  // Always use Modal GPU for watermark removal
+  console.log(`[Worker] 🚀 Using Modal GPU for watermark removal`);
+  console.log(`[Worker]    Platform: ${platform}`);
   
-  // Use inpainting for inpaint or auto mode
-  const inpaintUrl = process.env.INPAINT_SERVICE_URL || "https://blanklogo-inpaint.onrender.com";
-  console.log(`[Worker] 🤖 Using AI inpainting (${inpaintUrl})`);
-  
-  try {
-    return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition);
-  } catch (error) {
-    // Fall back to crop if inpainting fails
-    console.log(`[Worker] ⚠️ Inpainting failed, falling back to crop mode`);
-    return await removeWatermarkCrop(inputPath, outputPath, cropPixels, cropPosition, videoInfo);
-  }
+  return await removeWatermarkInpaint(inputPath, outputPath, cropPixels, cropPosition, platform);
 }
 
 async function uploadToStorage(filePath: string, jobId: string, filename: string): Promise<string> {
@@ -1144,7 +1124,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
     console.log(`[Worker]    Mode: ${processingMode}`);
     console.log(`[Worker]    Crop: ${cropPixels}px from ${cropPosition}`);
     const processStart = Date.now();
-    const processResult = await removeWatermark(inputPath, outputPath, cropPixels, cropPosition, videoInfo, processingMode);
+    const processResult = await removeWatermark(inputPath, outputPath, cropPixels, cropPosition, videoInfo, processingMode, job.data.platform || "sora");
     const processTime = Date.now() - processStart;
     console.log(`[Worker] ✅ Watermark removal complete:`);
     console.log(`[Worker]    Method used: ${processResult.mode}`);
