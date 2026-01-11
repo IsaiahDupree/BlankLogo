@@ -315,6 +315,343 @@ export function trackLogin(params: {
   });
 }
 
+// Track user logout
+export function trackLogout(): void {
+  trackEvent('user_logged_out');
+  reset();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VIDEO UPLOAD & PROCESSING EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// Track video upload started
+export function trackVideoUploadStarted(params: {
+  fileSize: number;
+  fileType: string;
+  platform: string;
+}): void {
+  trackEvent('video_upload_started', {
+    file_size_mb: Math.round(params.fileSize / 1024 / 1024 * 100) / 100,
+    file_type: params.fileType,
+    platform: params.platform,
+  });
+}
+
+// Track video upload completed
+export function trackVideoUploadCompleted(params: {
+  fileSize: number;
+  uploadTimeMs: number;
+  platform: string;
+}): void {
+  trackEvent('video_upload_completed', {
+    file_size_mb: Math.round(params.fileSize / 1024 / 1024 * 100) / 100,
+    upload_time_ms: params.uploadTimeMs,
+    platform: params.platform,
+  });
+}
+
+// Track URL submitted
+export function trackUrlSubmitted(params: {
+  platform: string;
+  urlDomain?: string;
+}): void {
+  trackEvent('url_submitted', {
+    platform: params.platform,
+    url_domain: params.urlDomain,
+  });
+}
+
+// Track platform selected
+export function trackPlatformSelected(params: {
+  platform: string;
+  previousPlatform?: string;
+}): void {
+  trackEvent('platform_selected', {
+    platform: params.platform,
+    previous_platform: params.previousPlatform,
+  });
+}
+
+// Track job progress update
+export function trackJobProgress(params: {
+  jobId: string;
+  progress: number;
+  status: string;
+}): void {
+  trackEvent('job_progress', {
+    job_id: params.jobId,
+    progress: params.progress,
+    status: params.status,
+  });
+}
+
+// Track job failed
+export function trackJobFailed(params: {
+  jobId: string;
+  platform: string;
+  errorCode?: string;
+  errorMessage?: string;
+}): void {
+  trackEvent('job_failed', {
+    job_id: params.jobId,
+    platform: params.platform,
+    error_code: params.errorCode,
+    error_message: params.errorMessage,
+  });
+}
+
+// Track video download
+export function trackVideoDownload(params: {
+  jobId: string;
+  platform: string;
+  fileSize?: number;
+}): void {
+  trackEvent('video_downloaded', {
+    job_id: params.jobId,
+    platform: params.platform,
+    file_size_mb: params.fileSize ? Math.round(params.fileSize / 1024 / 1024 * 100) / 100 : undefined,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CREDITS & BILLING EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// Track credits viewed
+export function trackCreditsViewed(params: {
+  currentBalance: number;
+}): void {
+  trackEvent('credits_viewed', {
+    current_balance: params.currentBalance,
+  });
+}
+
+// Track credit pack viewed
+export function trackCreditPackViewed(params: {
+  packId: string;
+  packName: string;
+  price: number;
+  credits: number;
+}): void {
+  trackEvent('credit_pack_viewed', {
+    pack_id: params.packId,
+    pack_name: params.packName,
+    price: params.price,
+    credits: params.credits,
+    price_per_credit: Math.round(params.price / params.credits * 100) / 100,
+  });
+}
+
+// Track checkout started
+export function trackCheckoutStarted(params: {
+  packId: string;
+  packName: string;
+  price: number;
+  credits: number;
+}): void {
+  trackEvent('checkout_started', {
+    pack_id: params.packId,
+    pack_name: params.packName,
+    price: params.price,
+    credits: params.credits,
+  });
+}
+
+// Track checkout abandoned
+export function trackCheckoutAbandoned(params: {
+  packId: string;
+  reason?: string;
+}): void {
+  trackEvent('checkout_abandoned', {
+    pack_id: params.packId,
+    reason: params.reason,
+  });
+}
+
+// Track insufficient credits
+export function trackInsufficientCredits(params: {
+  currentBalance: number;
+  requiredCredits: number;
+  action: string;
+}): void {
+  trackEvent('insufficient_credits', {
+    current_balance: params.currentBalance,
+    required_credits: params.requiredCredits,
+    action: params.action,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NAVIGATION & ENGAGEMENT EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// Track page time spent
+export function trackTimeOnPage(params: {
+  page: string;
+  timeSpentMs: number;
+}): void {
+  trackEvent('time_on_page', {
+    page: params.page,
+    time_spent_seconds: Math.round(params.timeSpentMs / 1000),
+  });
+}
+
+// Track CTA clicked
+export function trackCtaClicked(params: {
+  ctaName: string;
+  ctaLocation: string;
+  page: string;
+}): void {
+  trackEvent('cta_clicked', {
+    cta_name: params.ctaName,
+    cta_location: params.ctaLocation,
+    page: params.page,
+  });
+}
+
+// Track feature used
+export function trackFeatureUsed(params: {
+  feature: string;
+  context?: string;
+}): void {
+  trackEvent('feature_used', {
+    feature: params.feature,
+    context: params.context,
+  });
+}
+
+// Track settings changed
+export function trackSettingsChanged(params: {
+  setting: string;
+  oldValue?: string | boolean | number;
+  newValue: string | boolean | number;
+}): void {
+  trackEvent('settings_changed', {
+    setting: params.setting,
+    old_value: params.oldValue,
+    new_value: params.newValue,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ERROR & SUPPORT EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// Track error occurred
+export function trackError(params: {
+  errorType: string;
+  errorMessage: string;
+  page?: string;
+  component?: string;
+}): void {
+  trackEvent('error_occurred', {
+    error_type: params.errorType,
+    error_message: params.errorMessage,
+    page: params.page,
+    component: params.component,
+  });
+}
+
+// Track API error
+export function trackApiError(params: {
+  endpoint: string;
+  statusCode: number;
+  errorMessage?: string;
+}): void {
+  trackEvent('api_error', {
+    endpoint: params.endpoint,
+    status_code: params.statusCode,
+    error_message: params.errorMessage,
+  });
+}
+
+// Track support requested
+export function trackSupportRequested(params: {
+  type: 'chat' | 'email' | 'docs';
+  page: string;
+}): void {
+  trackEvent('support_requested', {
+    type: params.type,
+    page: params.page,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ONBOARDING & ACTIVATION EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// Track onboarding step
+export function trackOnboardingStep(params: {
+  step: number;
+  stepName: string;
+  completed: boolean;
+}): void {
+  trackEvent('onboarding_step', {
+    step: params.step,
+    step_name: params.stepName,
+    completed: params.completed,
+  });
+}
+
+// Track first job completed (activation)
+export function trackActivation(params: {
+  userId: string;
+  platform: string;
+  daysFromSignup: number;
+}): void {
+  trackEvent('user_activated', {
+    platform: params.platform,
+    days_from_signup: params.daysFromSignup,
+  });
+  
+  setUserProperties({
+    activated: true,
+    activation_date: new Date().toISOString(),
+    activation_platform: params.platform,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MARKETING & ATTRIBUTION EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// Track UTM parameters
+export function trackUtmParams(params: {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+}): void {
+  if (params.utmSource || params.utmMedium || params.utmCampaign) {
+    trackEvent('utm_captured', {
+      utm_source: params.utmSource,
+      utm_medium: params.utmMedium,
+      utm_campaign: params.utmCampaign,
+      utm_content: params.utmContent,
+      utm_term: params.utmTerm,
+    });
+    
+    setUserProperties({
+      initial_utm_source: params.utmSource,
+      initial_utm_medium: params.utmMedium,
+      initial_utm_campaign: params.utmCampaign,
+    });
+  }
+}
+
+// Track referral
+export function trackReferral(params: {
+  referralCode: string;
+  referrerId?: string;
+}): void {
+  trackEvent('referral_used', {
+    referral_code: params.referralCode,
+    referrer_id: params.referrerId,
+  });
+}
+
 // Check if PostHog is configured
 export function isConfigured(): boolean {
   return !!POSTHOG_KEY;
@@ -347,6 +684,30 @@ export default {
   trackJobCompleted,
   trackSignUp,
   trackLogin,
+  trackLogout,
+  trackVideoUploadStarted,
+  trackVideoUploadCompleted,
+  trackUrlSubmitted,
+  trackPlatformSelected,
+  trackJobProgress,
+  trackJobFailed,
+  trackVideoDownload,
+  trackCreditsViewed,
+  trackCreditPackViewed,
+  trackCheckoutStarted,
+  trackCheckoutAbandoned,
+  trackInsufficientCredits,
+  trackTimeOnPage,
+  trackCtaClicked,
+  trackFeatureUsed,
+  trackSettingsChanged,
+  trackError,
+  trackApiError,
+  trackSupportRequested,
+  trackOnboardingStep,
+  trackActivation,
+  trackUtmParams,
+  trackReferral,
   isConfigured,
   getPostHog,
 };

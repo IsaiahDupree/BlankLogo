@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Eye, EyeOff } from "lucide-react";
+import { trackLogin, trackError } from "@/lib/posthog";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -48,6 +49,7 @@ export default function LoginPage() {
       console.error("[LOGIN] ❌ Login failed:", error.message);
       console.error("[LOGIN] Error details:", error);
       setError(error.message);
+      trackError({ errorType: 'login_failed', errorMessage: error.message, page: '/login' });
       setLoading(false);
       return;
     }
@@ -57,6 +59,11 @@ export default function LoginPage() {
     console.log("[LOGIN] User email:", data.user?.email);
     console.log("[LOGIN] Session expires:", data.session?.expires_at);
     console.log("[LOGIN] 🔄 Redirecting to /app...");
+    
+    // Track successful login
+    if (data.user?.id) {
+      trackLogin({ userId: data.user.id, method: 'email' });
+    }
     
     router.push("/app");
     router.refresh();

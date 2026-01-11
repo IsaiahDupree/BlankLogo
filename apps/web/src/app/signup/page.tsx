@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { trackCompleteRegistration } from "@/lib/meta-pixel";
+import { trackSignUp, trackError } from "@/lib/posthog";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -50,6 +51,7 @@ export default function SignupPage() {
       console.error("[SIGNUP] ❌ Signup failed:", error.message);
       console.error("[SIGNUP] Error details:", error);
       setError(error.message);
+      trackError({ errorType: 'signup_failed', errorMessage: error.message, page: '/signup' });
       setLoading(false);
       return;
     }
@@ -58,6 +60,11 @@ export default function SignupPage() {
     console.log("[SIGNUP] User ID:", data.user?.id);
     console.log("[SIGNUP] User email:", data.user?.email);
     console.log("[SIGNUP] 📧 Confirmation email sent");
+    
+    // Track signup for PostHog
+    if (data.user?.id) {
+      trackSignUp({ userId: data.user.id, method: 'email', email: data.user.email });
+    }
     
     // Track CompleteRegistration for Meta Pixel
     trackCompleteRegistration({ contentName: 'BlankLogo Account', status: 'pending_confirmation' });
