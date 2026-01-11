@@ -10,6 +10,7 @@ import * as http from "http";
 import { downloadVideo, checkCapabilities } from "./download.js";
 import { notifyJobStarted, notifyJobCompleted, notifyJobFailed, notifyCreditsLow } from "./userNotify.js";
 import { processVideoWithModal, checkModalHealth } from "./modal-client.js";
+import { initPostHog, shutdownPostHog, job as phJob, error as phError, system as phSystem, normalizeErrorCode } from "./lib/posthog.js";
 
 const WORKER_ID = process.env.WORKER_ID ?? `worker-${Math.random().toString(16).slice(2, 10)}`;
 const SERVICE_NAME = 'worker';
@@ -1026,13 +1027,19 @@ async function sendWebhook(webhookUrl: string, payload: Record<string, unknown>)
 async function processJob(job: Job<JobData>): Promise<void> {
   const { jobId, inputUrl, inputFilename, cropPixels, cropPosition, processingMode = "crop", webhookUrl } = job.data;
   const startTime = Date.now();
+  const userId = job.data.userId;
+  const platform = job.data.platform || 'auto';
+  const attemptNum = job.attemptsMade + 1;
+
+  // Track job dequeued
+  phJob.dequeued({ job_id: jobId, user_id: userId, attempt: attemptNum });
 
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`[Worker] 🎬 STARTING JOB: ${jobId}`);
   console.log(`${'═'.repeat(60)}`);
   console.log(`[Worker] 📋 Job Details:`);
   console.log(`[Worker]    Input URL: ${inputUrl}`);
-  console.log(`[Worker]    Platform: ${job.data.platform || 'auto'}`);
+  console.log(`[Worker]    Platform: ${platform}`);
   console.log(`[Worker]    Crop Pixels: ${cropPixels}px (${cropPosition})`);
   console.log(`[Worker]    Processing Mode: ${processingMode}`);
   console.log(`[Worker]    Webhook: ${webhookUrl || 'none'}`);
@@ -1204,6 +1211,15 @@ async function processJob(job: Job<JobData>): Promise<void> {
     console.log(`[Worker]    Output: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
     console.log(`${'═'.repeat(60)}\n`);
 
+    // Track job completed
+    phJob.completed({
+      job_id: jobId,
+      user_id: userId,
+      total_duration_ms: processingTime,
+      output_mb: outputSize / 1024 / 1024,
+      platform,
+    });
+
     // Send webhook if configured
     if (webhookUrl) {
       await sendWebhook(webhookUrl, {
@@ -1239,6 +1255,7 @@ async function processJob(job: Job<JobData>): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : "";
+    const errorCode = normalizeErrorCode(error);
     
     console.log(`\n${'═'.repeat(60)}`);
     console.error(`[Worker] ❌ JOB FAILED: ${jobId}`);
@@ -1248,6 +1265,27 @@ async function processJob(job: Job<JobData>): Promise<void> {
       console.error(`[Worker]    Stack: ${errorStack.split('\n').slice(0, 3).join('\n')}`);
     }
     console.log(`${'═'.repeat(60)}\n`);
+
+    // Track job failed
+    phJob.failed({
+      job_id: jobId,
+      user_id: userId,
+      failure_stage: 'modal',
+      error_code: errorCode,
+      error_message: errorMessage,
+      attempt: attemptNum,
+      platform,
+    });
+
+    // Also track as error event
+    phError.worker({
+      job_id: jobId,
+      user_id: userId,
+      failure_stage: 'modal',
+      attempt: attemptNum,
+      error_code: errorCode,
+      message: errorMessage,
+    });
 
     const processingTime = Date.now() - startTime;
     const { error: failUpdateError } = await supabase
@@ -1311,6 +1349,10 @@ async function processJob(job: Job<JobData>): Promise<void> {
 async function main(): Promise<void> {
   console.log(`[Worker] Starting BlankLogo worker ${WORKER_ID}`);
   console.log(`[Worker] Concurrency: ${CONCURRENCY}`);
+  
+  // Initialize PostHog analytics
+  initPostHog();
+  phSystem.workerStarted({ worker_id: WORKER_ID });
   
   // Log download capabilities
   const caps = await checkCapabilities();
@@ -1384,6 +1426,8 @@ async function main(): Promise<void> {
   // Graceful shutdown
   const shutdown = async () => {
     console.log("[Worker] Shutting down...");
+    phSystem.workerShutdown({ worker_id: WORKER_ID, reason: 'graceful' });
+    await shutdownPostHog();
     await worker.close();
     await redis.quit();
     process.exit(0);
