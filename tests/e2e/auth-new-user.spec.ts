@@ -11,14 +11,23 @@
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'https://www.blanklogo.app';
-const TEST_EMAIL_PREFIX = 'e2e-auth-test';
 const TEST_PASSWORD = 'TestPassword123!';
+const BASE_EMAIL = process.env.TEST_BASE_EMAIL || 'isaiahdupree33@gmail.com';
 
-// Generate unique test email
+// Generate unique test email using Gmail + addressing
+// isaiahdupree33+test123@gmail.com goes to isaiahdupree33@gmail.com
 function generateTestEmail(): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(7);
-  return `${TEST_EMAIL_PREFIX}+${timestamp}-${random}@blanklogo.app`;
+  const [localPart, domain] = BASE_EMAIL.split('@');
+  return `${localPart}+e2e-${timestamp}-${random}@${domain}`;
+}
+
+// Generate test emails for specific test scenarios
+function generateScenarioEmail(scenario: string): string {
+  const timestamp = Date.now();
+  const [localPart, domain] = BASE_EMAIL.split('@');
+  return `${localPart}+${scenario}-${timestamp}@${domain}`;
 }
 
 test.describe('New User Signup Flow', () => {

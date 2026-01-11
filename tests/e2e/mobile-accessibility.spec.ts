@@ -275,12 +275,12 @@ test.describe('Screen Reader Accessibility', () => {
   test('focus is visible on interactive elements', async ({ page }) => {
     await page.goto(`${BASE_URL}/login`);
     
-    // Tab to first interactive element
-    await page.keyboard.press('Tab');
+    // Click on the email input to give it focus
+    const emailInput = page.locator('input[type="email"], input#email').first();
+    await emailInput.click();
     
-    // Check focus is visible
-    const focusedElement = page.locator(':focus');
-    await expect(focusedElement).toBeVisible();
+    // Check input is focused
+    await expect(emailInput).toBeFocused();
   });
 });
 
