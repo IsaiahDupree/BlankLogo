@@ -99,18 +99,38 @@ test.describe('New User Signup Flow', () => {
 
   test('successful signup shows confirmation message', async ({ page }) => {
     const testEmail = generateTestEmail();
+    console.log(`[SIGNUP TEST] Testing with email: ${testEmail}`);
     
     await page.locator('input[type="email"], input#email').fill(testEmail);
     await page.locator('input[type="password"], input#password').fill(TEST_PASSWORD);
     await page.locator('button[type="submit"]').click();
     
-    // Should show success message OR stay on signup with no error (rate limiting)
+    // Wait for response
     await page.waitForTimeout(3000);
-    const hasSuccess = await page.getByText(/check your email|confirmation|verify|sent/i).isVisible().catch(() => false);
-    const hasError = await page.locator('.bg-red-500, [class*="error"]').isVisible().catch(() => false);
     
-    // Pass if we see success message OR no error (rate limit may prevent duplicate signups)
-    expect(hasSuccess || !hasError).toBe(true);
+    // Check for database error - this is a FAILURE
+    const hasDatabaseError = await page.getByText(/database error/i).isVisible().catch(() => false);
+    if (hasDatabaseError) {
+      const errorText = await page.locator('.bg-red-500').textContent().catch(() => 'Unknown error');
+      console.error(`[SIGNUP TEST] ❌ DATABASE ERROR: ${errorText}`);
+      throw new Error(`Signup failed with database error: ${errorText}`);
+    }
+    
+    // Check for success
+    const hasSuccess = await page.getByText(/check your email|confirmation|verify|sent/i).isVisible().catch(() => false);
+    if (hasSuccess) {
+      console.log('[SIGNUP TEST] ✅ Success - confirmation email sent');
+    } else {
+      // Check for any other error
+      const hasError = await page.locator('.bg-red-500').isVisible().catch(() => false);
+      if (hasError) {
+        const errorText = await page.locator('.bg-red-500').textContent().catch(() => 'Unknown error');
+        console.error(`[SIGNUP TEST] ❌ Error: ${errorText}`);
+        throw new Error(`Signup failed: ${errorText}`);
+      }
+    }
+    
+    expect(hasSuccess).toBe(true);
   });
 });
 
