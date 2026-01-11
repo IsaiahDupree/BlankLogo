@@ -402,10 +402,10 @@ export default function RemoveWatermarkPage() {
     const progress = jobStatus?.progress || 0;
     
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
         <div className="rounded-2xl bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/20 overflow-hidden">
           {/* Animated header */}
-          <div className="relative p-8 text-center overflow-hidden">
+          <div className="relative p-6 sm:p-8 text-center overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-pulse" />
             <div className="relative">
               <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center animate-pulse">
@@ -495,10 +495,10 @@ export default function RemoveWatermarkPage() {
     const inputUrl = jobStatus?.input?.url || jobStatus?.input_url;
     
     return (
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
         <div className="rounded-2xl bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/20 overflow-hidden">
           {/* Success header */}
-          <div className="p-6 text-center border-b border-green-500/20">
+          <div className="p-4 sm:p-6 text-center border-b border-green-500/20">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
@@ -630,13 +630,13 @@ export default function RemoveWatermarkPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <Sparkles className="w-8 h-8 text-indigo-400" />
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center gap-2 sm:gap-3">
+          <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-400" />
           Remove Watermark
         </h1>
-        <p className="text-gray-400">Upload a video or paste a URL to remove watermarks</p>
+        <p className="text-sm sm:text-base text-gray-400">Upload a video or paste a URL to remove watermarks</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -791,7 +791,7 @@ export default function RemoveWatermarkPage() {
 
           {/* Other platforms in grid */}
           <div className="text-xs text-gray-500 mb-2">Or select a specific platform:</div>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-2">
             {PLATFORMS.filter(p => p.id !== "auto").map((p) => (
               <button
                 key={p.id}

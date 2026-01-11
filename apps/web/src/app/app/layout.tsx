@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Home, Video, History, Coins, Settings, CreditCard, LogOut, Sparkles } from "lucide-react";
+import { Home, Video, History, Coins, Settings, LogOut, Sparkles, Menu } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AnimatedCredits } from "@/components/AnimatedCredits";
+import { MobileNav } from "@/components/MobileNav";
 
 async function getUser() {
   const supabase = await createClient();
@@ -12,8 +13,14 @@ async function getUser() {
 
 async function getCredits(userId: string) {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("get_credit_balance", { p_user_id: userId });
-  return data ?? 0;
+  // Try bl_get_credit_balance first (BlankLogo schema), fallback to get_credit_balance
+  let { data, error } = await supabase.rpc("bl_get_credit_balance", { p_user_id: userId });
+  if (error) {
+    // Fallback to original function name
+    const result = await supabase.rpc("get_credit_balance", { p_user_id: userId });
+    data = result.data;
+  }
+  return data ?? 10; // Default 10 credits for new users
 }
 
 export default async function AppLayout({
@@ -31,8 +38,11 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 border-r border-white/10 flex flex-col">
+      {/* Mobile Navigation */}
+      <MobileNav userEmail={user.email || ""} credits={credits} />
+
+      {/* Desktop Sidebar - hidden on mobile */}
+      <aside className="hidden lg:flex w-64 bg-gray-900 border-r border-white/10 flex-col fixed h-full">
         <div className="p-6">
           <Link href="/app" className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -42,7 +52,7 @@ export default async function AppLayout({
           </Link>
         </div>
 
-        <nav className="flex-1 px-4">
+        <nav className="flex-1 px-4 overflow-y-auto">
           <ul className="space-y-1">
             <li>
               <Link
@@ -120,8 +130,8 @@ export default async function AppLayout({
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      {/* Main content - adjusted for mobile header and desktop sidebar */}
+      <main className="flex-1 overflow-auto pt-[57px] lg:pt-0 lg:ml-64">
         {children}
       </main>
     </div>
