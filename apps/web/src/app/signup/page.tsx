@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { trackCompleteRegistration } from "@/lib/meta-pixel";
-import { trackSignUp, trackError } from "@/lib/posthog";
+import { auth, error as phError } from "@/lib/posthog-events";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -51,7 +51,7 @@ export default function SignupPage() {
       console.error("[SIGNUP] ❌ Signup failed:", error.message);
       console.error("[SIGNUP] Error details:", error);
       setError(error.message);
-      trackError({ errorType: 'signup_failed', errorMessage: error.message, page: '/signup' });
+      phError.ui({ error_code: 'E_AUTH_FAILED', route: '/signup', message: error.message });
       setLoading(false);
       return;
     }
@@ -63,7 +63,7 @@ export default function SignupPage() {
     
     // Track signup for PostHog
     if (data.user?.id) {
-      trackSignUp({ userId: data.user.id, method: 'email', email: data.user.email });
+      auth.signedIn({ user_id: data.user.id, method: 'email', is_new_user: true, email: data.user.email });
     }
     
     // Track CompleteRegistration for Meta Pixel

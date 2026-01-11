@@ -6,18 +6,7 @@ import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Dow
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 import { trackGenerateRequested, trackMediaReady, trackDownload } from "@/lib/meta-pixel";
-import { 
-  trackVideoUploadStarted, 
-  trackVideoUploadCompleted, 
-  trackUrlSubmitted, 
-  trackPlatformSelected,
-  trackJobCreated,
-  trackJobCompleted,
-  trackJobFailed,
-  trackJobProgress,
-  trackVideoDownload,
-  trackError
-} from "@/lib/posthog";
+import { upload, job as phJob, error as phError, generateRequestId } from "@/lib/posthog-events";
 
 // Logging utility
 function logRemove(message: string, data?: unknown) {
@@ -159,11 +148,10 @@ export default function RemoveWatermarkPage() {
             processingTimeMs: job.processingTimeMs 
           });
           // Track job completion for PostHog
-          trackJobCompleted({
-            jobId: job.jobId || job.id,
+          phJob.completed({
+            job_id: job.jobId || job.id,
             platform: job.platform || 'unknown',
-            processingTimeMs: job.processingTimeMs || 0,
-            success: true
+            total_duration_ms: job.processingTimeMs || 0,
           });
           console.log("%c✅ JOB COMPLETED!", "color: green; font-size: 16px; font-weight: bold;");
           logRemove("✅ Job completed!", { 
@@ -177,11 +165,11 @@ export default function RemoveWatermarkPage() {
           setError(errorMsg);
           toast.error(errorMsg);
           // Track job failure for PostHog
-          trackJobFailed({
-            jobId: job.jobId || job.id,
+          phJob.failed({
+            job_id: job.jobId || job.id,
             platform: job.platform || 'unknown',
-            errorCode: job.error_code,
-            errorMessage: errorMsg
+            failure_stage: 'modal',
+            error_code: 'E_UNKNOWN',
           });
           console.log("%c❌ JOB FAILED!", "color: red; font-size: 16px; font-weight: bold;");
           logRemove("❌ Job failed:", { 
@@ -261,7 +249,7 @@ export default function RemoveWatermarkPage() {
     const file = e.target.files?.[0];
     if (file) {
       logRemove("📁 File selected:", { name: file.name, size: file.size, type: file.type });
-      trackVideoUploadStarted({ fileSize: file.size, fileType: file.type, platform });
+      upload.started({ file_ext: file.name.split('.').pop() || 'mp4', file_mb: file.size / 1024 / 1024 });
       setSelectedFile(file);
       setError(null);
     }
@@ -272,7 +260,7 @@ export default function RemoveWatermarkPage() {
     const file = e.dataTransfer.files?.[0];
     if (file) {
       logRemove("📁 File dropped:", { name: file.name, size: file.size, type: file.type });
-      trackVideoUploadStarted({ fileSize: file.size, fileType: file.type, platform });
+      upload.started({ file_ext: file.name.split('.').pop() || 'mp4', file_mb: file.size / 1024 / 1024 });
       setSelectedFile(file);
       setError(null);
     }
@@ -304,7 +292,7 @@ export default function RemoveWatermarkPage() {
       
       if (mode === "url") {
         logRemove("🌐 Calling API:", { url: `${apiUrl}/api/v1/jobs`, videoUrl, platform, cropPixels });
-        trackUrlSubmitted({ platform, urlDomain: new URL(videoUrl).hostname });
+        upload.urlSubmitted({ url_domain: new URL(videoUrl).hostname, platform });
         
         const res = await fetch(`${apiUrl}/api/v1/jobs`, {
           method: "POST",
@@ -347,7 +335,7 @@ export default function RemoveWatermarkPage() {
         // Track GenerateRequested for Meta Pixel
         trackGenerateRequested({ platform, processingMode: 'inpaint', jobId: data.jobId });
         // Track job created for PostHog
-        trackJobCreated({ jobId: data.jobId, platform, processingMode: 'inpaint', inputType: 'url' });
+        phJob.created({ job_id: data.jobId, job_type: 'watermark_remove', platform, input_type: 'url' });
         console.log("%c🎬 JOB CREATED: " + data.jobId, "color: green; font-size: 14px; font-weight: bold;");
         logRemove("✅ Job created successfully:", {
           jobId: data.jobId,
@@ -409,8 +397,8 @@ export default function RemoveWatermarkPage() {
         // Track GenerateRequested for Meta Pixel
         trackGenerateRequested({ platform, processingMode: 'inpaint', jobId: createdJobId });
         // Track job created and upload completed for PostHog
-        trackVideoUploadCompleted({ fileSize: selectedFile.size, uploadTimeMs: Date.now(), platform });
-        trackJobCreated({ jobId: createdJobId, platform, processingMode: 'inpaint', inputType: 'upload' });
+        upload.completed({ upload_ms: 0, file_mb: selectedFile.size / 1024 / 1024 });
+        phJob.created({ job_id: createdJobId, job_type: 'watermark_remove', platform, input_type: 'upload' });
         console.log("%c🎬 UPLOAD JOB CREATED: " + createdJobId, "color: green; font-size: 14px; font-weight: bold;");
         logRemove("✅ Upload successful:", {
           jobId: createdJobId,
@@ -426,7 +414,7 @@ export default function RemoveWatermarkPage() {
       const errorMessage = err instanceof Error ? err.message : "Something went wrong";
       setError(errorMessage);
       toast.error(errorMessage);
-      trackError({ errorType: 'job_submission', errorMessage, page: '/app/remove' });
+      phError.ui({ error_code: 'E_UNKNOWN', route: '/app/remove', message: errorMessage });
     } finally {
       setLoading(false);
     }
