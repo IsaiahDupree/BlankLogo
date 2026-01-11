@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AnimatedCredits } from "@/components/AnimatedCredits";
 import { MobileNav } from "@/components/MobileNav";
+import { PromoRedeemer } from "@/components/promo-redeemer";
 
 async function getUser() {
   const supabase = await createClient();
@@ -134,6 +135,9 @@ export default async function AppLayout({
       <main className="flex-1 overflow-auto pt-[57px] lg:pt-0 lg:ml-64">
         {children}
       </main>
+      
+      {/* Auto-redeem promo credits for new users */}
+      <PromoRedeemer />
     </div>
   );
 }

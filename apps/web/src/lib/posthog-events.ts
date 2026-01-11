@@ -484,6 +484,81 @@ export const system = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
+// G) PROMO EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+export const promo = {
+  /** Promo landing page viewed */
+  landingViewed: (props: { 
+    campaign_id: string; 
+    utm_source?: string; 
+    utm_campaign?: string; 
+    fbclid_present?: boolean;
+    gclid_present?: boolean;
+  }) => {
+    track('promo_landing_viewed', props);
+  },
+
+  /** Promo token issued (cookie set) */
+  tokenIssued: (props: { campaign_id: string; expires_at: number }) => {
+    track('promo_token_issued', props);
+  },
+
+  /** Promo redemption attempted */
+  redeemAttempted: (props: { campaign_id: string }) => {
+    track('promo_redeem_attempted', props);
+  },
+
+  /** Promo credits awarded successfully */
+  creditsAwarded: (props: { campaign_id: string; credits: number; new_balance: number }) => {
+    track('promo_credits_awarded', props);
+  },
+
+  /** Promo redemption blocked */
+  redeemBlocked: (props: { 
+    campaign_id: string; 
+    reason: 'no_token' | 'invalid_token' | 'expired' | 'already_redeemed' | 'user_not_new' | 'campaign_maxed' | 'campaign_disabled' | 'rate_limited';
+  }) => {
+    track('promo_redeem_blocked', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// H) CREDIT EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+export const credits = {
+  /** Credits awarded (any reason) */
+  awarded: (props: { 
+    rule_id?: string; 
+    credits_delta: number; 
+    reason: string; 
+    event_id?: string;
+    new_balance: number;
+  }) => {
+    track('credits_awarded', props);
+  },
+
+  /** Credits spent (job charge) */
+  spent: (props: CorrelationIds & { 
+    credits_delta: number; 
+    balance_after: number;
+  }) => {
+    track('credits_spent', props);
+  },
+
+  /** Credits balance low warning */
+  balanceLow: (props: { balance: number; threshold: number }) => {
+    track('credits_balance_low', props);
+  },
+
+  /** Credits balance depleted */
+  depleted: (props: CorrelationIds) => {
+    track('credits_depleted', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════
 
@@ -500,4 +575,6 @@ export default {
   job,
   error,
   system,
+  promo,
+  credits,
 };
