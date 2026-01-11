@@ -4,9 +4,11 @@ FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (non-interactive)
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg git libgl1-mesa-glx libglib2.0-0 \
+    ffmpeg git libgl1-mesa-glx libglib2.0-0 tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
