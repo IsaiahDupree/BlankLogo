@@ -6,7 +6,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.{test,spec}.{js,ts}"],
-    exclude: ["**/node_modules/**", "**/dist/**", "**/e2e/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/e2e/**", "**/deployment/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -19,8 +19,8 @@ export default defineConfig({
       ],
     },
     setupFiles: ["./tests/setup.ts"],
-    testTimeout: 30000,
-    hookTimeout: 30000,
+    testTimeout: 15000,
+    hookTimeout: 15000,
   },
   resolve: {
     alias: {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_SERVICE_KEY } from "./config";
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY } from "./config";
 
 // ============================================
 // Row Level Security (RLS) Tests
@@ -17,10 +17,53 @@ beforeAll(async () => {
   adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   try {
-    // Use existing test user from database (foreign key constraint requires real user)
-    const existingUserId = "e3020b92-641f-49da-a9d1-b37c8daf56b0"; // isaiahdupree33@gmail.com
-    user1Id = existingUserId;
-    user2Id = existingUserId; // Same user for isolation (RLS tests verify ownership logic)
+    // Try to sign up/login user via normal auth flow
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    // First try login
+    let authResult = await authClient.auth.signInWithPassword({
+      email: 'isaiahdupree33@gmail.com',
+      password: 'Frogger12',
+    });
+    
+    // If login fails, try signup
+    if (authResult.error || !authResult.data.user) {
+      authResult = await authClient.auth.signUp({
+        email: 'isaiahdupree33@gmail.com',
+        password: 'Frogger12',
+        options: {
+          emailRedirectTo: undefined,
+        },
+      });
+    }
+    
+    if (authResult.error || !authResult.data.user) {
+      // Last resort: query via admin API
+      const listResponse = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        headers: {
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        },
+      });
+      
+      if (listResponse.ok) {
+        const userList = await listResponse.json();
+        const user = userList.users?.find((u: any) => u.email === 'isaiahdupree33@gmail.com');
+        if (user) {
+          user1Id = user.id;
+          console.log(`✓ Found test user via admin API: ${user1Id}`);
+        } else {
+          throw new Error(`Failed to authenticate or find test user: ${authResult.error?.message || 'User not found'}`);
+        }
+      } else {
+        throw new Error(`Failed to query users: ${await listResponse.text()}`);
+      }
+    } else {
+      user1Id = authResult.data.user.id;
+      console.log(`✓ Authenticated test user: ${user1Id}`);
+    }
+    
+    user2Id = user1Id; // Same user for isolation (RLS tests verify ownership logic)
 
     // Create test projects directly (service role bypasses RLS)
     const { data: project1, error: projErr1 } = await adminClient
@@ -362,9 +405,11 @@ describe("Assets RLS", () => {
 
 describe("Credit Ledger RLS", () => {
   let testLedgerId: string;
-  const testUserId = "8d954cc4-a5c3-4bb8-b6ef-1cd38f24af28"; // isaiahdupree33@gmail.com
+  let testUserId: string;
 
   beforeAll(async () => {
+    // Use the authenticated user ID
+    testUserId = user1Id;
     const { data: entry } = await adminClient
       .from("bl_credit_ledger")
       .insert({

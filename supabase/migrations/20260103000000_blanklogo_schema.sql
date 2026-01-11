@@ -129,23 +129,23 @@ CREATE POLICY "bl_users_view_own_usage" ON bl_usage_logs
     FOR SELECT USING (auth.uid() = user_id);
 
 -- Function to generate BlankLogo API key
-CREATE OR REPLACE FUNCTION bl_generate_api_key()
+CREATE OR REPLACE FUNCTION public.bl_generate_api_key()
 RETURNS TEXT AS $$
 BEGIN
-    RETURN 'bl_' || encode(gen_random_bytes(24), 'hex');
+    RETURN 'bl_' || encode(extensions.gen_random_bytes(24), 'hex');
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions;
 
 -- Function to create user profile on signup (BlankLogo specific)
-CREATE OR REPLACE FUNCTION bl_handle_new_user()
+CREATE OR REPLACE FUNCTION public.bl_handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO bl_user_profiles (id, email, api_key)
-    VALUES (NEW.id, NEW.email, bl_generate_api_key())
+    INSERT INTO public.bl_user_profiles (id, email, api_key)
+    VALUES (NEW.id, NEW.email, public.bl_generate_api_key())
     ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions;
 
 -- Trigger to create BlankLogo profile on user signup
 DROP TRIGGER IF EXISTS bl_on_auth_user_created ON auth.users;

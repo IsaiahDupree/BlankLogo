@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
-import { trackCompleteRegistration } from "@/lib/meta-pixel";
+import { trackCompleteRegistration, trackViewContent, trackLead } from "@/lib/meta-pixel";
 import { auth, error as phError } from "@/lib/posthog-events";
 
 export default function SignupPage() {
@@ -21,6 +21,8 @@ export default function SignupPage() {
   useEffect(() => {
     console.log("[SIGNUP PAGE] 📝 Page mounted");
     console.log("[SIGNUP PAGE] Supabase client initialized");
+    // Track signup page view for Meta Pixel
+    trackViewContent({ contentName: 'Signup Page', contentCategory: 'auth' });
     return () => console.log("[SIGNUP PAGE] 📝 Page unmounted");
   }, []);
 

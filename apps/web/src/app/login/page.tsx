@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { auth, error as phError } from "@/lib/posthog-events";
+import { trackViewContent } from "@/lib/meta-pixel";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -20,6 +21,8 @@ export default function LoginPage() {
   useEffect(() => {
     console.log("[LOGIN PAGE] 🔐 Page mounted");
     console.log("[LOGIN PAGE] Supabase client initialized");
+    // Track login page view for Meta Pixel
+    trackViewContent({ contentName: 'Login Page', contentCategory: 'auth' });
     return () => {
       console.log("[LOGIN PAGE] 🔐 Page unmounted");
     };

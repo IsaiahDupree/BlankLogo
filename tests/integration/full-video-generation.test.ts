@@ -115,20 +115,34 @@ async function waitForJobCompletion(
 
 // Get user ID from email
 async function getUserId(email: string): Promise<string | null> {
+  // Try admin API first
+  const listResponse = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    headers: {
+      'apikey': SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+    },
+  });
+  
+  if (listResponse.ok) {
+    const userList = await listResponse.json();
+    const user = userList.users?.find((u: any) => u.email === email);
+    if (user) {
+      return user.id;
+    }
+  }
+  
+  // Fallback: try profiles table
   const { data, error } = await supabase
     .from("profiles")
     .select("id")
     .eq("email", email)
     .single();
 
-  if (error || !data) {
-    // Try auth.users
-    const { data: authData } = await supabase.auth.admin.listUsers();
-    const user = authData?.users?.find((u) => u.email === email);
-    return user?.id || null;
+  if (!error && data) {
+    return data.id;
   }
 
-  return data.id;
+  return null;
 }
 
 describe("ACTUAL Video Generation - 1 Minute Video", () => {

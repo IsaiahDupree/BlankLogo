@@ -52,3 +52,4 @@ packages/remotion/out/
 .vercel
 .env.runpod
 .env.runpod
+.env.vercel.local

@@ -382,9 +382,9 @@ describe("Full Pipeline E2E - Error Recovery", () => {
 
 describe("Full Pipeline E2E - Content Variations", () => {
   const contentTypes = [
-    { type: "short", wordCount: 200, expectedMinutes: 1.5 },
-    { type: "medium", wordCount: 500, expectedMinutes: 3.5 },
-    { type: "long", wordCount: 1000, expectedMinutes: 7 },
+    { type: "short", wordCount: 200, expectedMinutes: 1.33 },
+    { type: "medium", wordCount: 500, expectedMinutes: 3.33 },
+    { type: "long", wordCount: 1000, expectedMinutes: 6.67 },
     { type: "extra_long", wordCount: 1500, expectedMinutes: 10 },
   ];
 

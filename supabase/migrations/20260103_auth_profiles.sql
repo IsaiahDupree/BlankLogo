@@ -155,19 +155,20 @@ CREATE POLICY "Users can cancel own deletion requests" ON bl_deletion_requests
   FOR UPDATE USING (auth.uid() = user_id AND status = 'pending');
 
 -- Function to auto-create profile on signup
-CREATE OR REPLACE FUNCTION handle_new_user()
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO bl_profiles (id, full_name, created_at, updated_at)
+  INSERT INTO public.bl_profiles (id, full_name, created_at, updated_at)
   VALUES (
     NEW.id,
-    NEW.raw_user_meta_data->>'full_name',
+    COALESCE(NEW.raw_user_meta_data->>'full_name', 'User'),
     NOW(),
     NOW()
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger for auto-creating profiles
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;

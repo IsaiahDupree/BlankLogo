@@ -9,7 +9,7 @@ import { trackPurchaseCAPI, trackSubscribeCAPI, generateEventId } from "@/lib/me
  * Body: { "event": "purchase" | "subscribe", "test": true }
  * 
  * After deployment, verify in Meta Events Manager:
- * https://business.facebook.com/events_manager2/list/pixel/1191876055285693/test_events
+ * https://business.facebook.com/events_manager2/list/pixel/10039038026189444/test_events
  */
 
 export async function POST(request: Request) {
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     event,
     eventId: testEventId,
     message: result 
-      ? "Event sent to Meta CAPI. Check Events Manager: https://business.facebook.com/events_manager2/list/pixel/1191876055285693/test_events"
+      ? "Event sent to Meta CAPI. Check Events Manager: https://business.facebook.com/events_manager2/list/pixel/10039038026189444/test_events"
       : "Failed to send event. Check META_CAPI_ACCESS_TOKEN is configured.",
     pixelId: process.env.NEXT_PUBLIC_META_PIXEL_ID || "NOT_SET",
     capiConfigured: !!process.env.META_CAPI_ACCESS_TOKEN,
@@ -74,6 +74,6 @@ export async function GET() {
     pixelId: process.env.NEXT_PUBLIC_META_PIXEL_ID || "NOT_SET",
     capiConfigured: !!process.env.META_CAPI_ACCESS_TOKEN,
     testUrl: "POST /api/test/pixel with x-internal-secret header",
-    eventsManager: "https://business.facebook.com/events_manager2/list/pixel/1191876055285693/test_events",
+    eventsManager: "https://business.facebook.com/events_manager2/list/pixel/10039038026189444/test_events",
   });
 }
