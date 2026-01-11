@@ -13,15 +13,20 @@ async function getUser() {
 }
 
 async function getCredits(userId: string) {
-  const supabase = await createClient();
-  // Try bl_get_credit_balance first (BlankLogo schema), fallback to get_credit_balance
-  let { data, error } = await supabase.rpc("bl_get_credit_balance", { p_user_id: userId });
-  if (error) {
-    // Fallback to original function name
-    const result = await supabase.rpc("get_credit_balance", { p_user_id: userId });
-    data = result.data;
+  try {
+    const supabase = await createClient();
+    // Try bl_get_credit_balance first (BlankLogo schema), fallback to get_credit_balance
+    let { data, error } = await supabase.rpc("bl_get_credit_balance", { p_user_id: userId });
+    if (error) {
+      // Fallback to original function name
+      const result = await supabase.rpc("get_credit_balance", { p_user_id: userId });
+      data = result.data;
+    }
+    return data ?? 10; // Default 10 credits for new users
+  } catch (e) {
+    console.error("Error fetching credits:", e);
+    return 10; // Default on error
   }
-  return data ?? 10; // Default 10 credits for new users
 }
 
 export default async function AppLayout({

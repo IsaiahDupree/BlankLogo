@@ -2,28 +2,26 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { initMetaPixel, trackPageView } from '@/lib/meta-pixel';
 
-const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || '';
-
+/**
+ * Meta Pixel Provider
+ * 
+ * Note: The base Meta Pixel code is loaded in layout.tsx via Next.js Script component.
+ * This provider only handles SPA route change tracking since the base code
+ * only fires PageView on initial page load.
+ */
 export function MetaPixelProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Initialize Meta Pixel on mount
+  // Track page views on client-side route changes (SPA navigation)
   useEffect(() => {
-    if (META_PIXEL_ID) {
-      initMetaPixel({
-        pixelId: META_PIXEL_ID,
-        autoConfig: true,
-        debug: process.env.NODE_ENV === 'development',
-      });
-    }
-  }, []);
-
-  // Track page views on route change
-  useEffect(() => {
-    if (META_PIXEL_ID && pathname) {
-      trackPageView(process.env.NODE_ENV === 'development');
+    // Only track if fbq is available and this is a route change (not initial load)
+    if (typeof window !== 'undefined' && window.fbq && pathname) {
+      // Small delay to avoid double-firing on initial load
+      const timer = setTimeout(() => {
+        window.fbq('track', 'PageView');
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [pathname]);
 
