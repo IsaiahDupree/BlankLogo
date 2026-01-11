@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePromoRedemption } from '@/hooks/use-promo-redemption';
-import { useToast } from '@/components/toast';
+import { useCelebration } from '@/components/credits-celebration';
 
 /**
  * PromoRedeemer - Automatically attempts to redeem promo credits after auth
@@ -12,7 +12,7 @@ import { useToast } from '@/components/toast';
  */
 export function PromoRedeemer() {
   const { redeemPromo, checkPromoStatus } = usePromoRedemption();
-  const toast = useToast();
+  const { showCelebration } = useCelebration();
   const hasAttempted = useRef(false);
 
   useEffect(() => {
@@ -36,8 +36,8 @@ export function PromoRedeemer() {
         const result = await redeemPromo();
 
         if (result.success && result.credits_awarded) {
-          // Show success toast
-          toast.success(`🎉 ${result.message || `You earned ${result.credits_awarded} bonus credits!`}`);
+          // Show celebration modal!
+          showCelebration(result.credits_awarded, 'promo_signup');
           console.log('[PromoRedeemer] Success!', result);
         } else if (result.error_code === 'already_redeemed') {
           // User already redeemed - this is fine, don't show error
@@ -57,7 +57,7 @@ export function PromoRedeemer() {
     // Small delay to ensure auth is fully settled
     const timer = setTimeout(attemptRedemption, 500);
     return () => clearTimeout(timer);
-  }, [checkPromoStatus, redeemPromo, toast]);
+  }, [checkPromoStatus, redeemPromo, showCelebration]);
 
   // This component renders nothing
   return null;

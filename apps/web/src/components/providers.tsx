@@ -5,6 +5,7 @@ import { ToastProvider } from "./toast";
 import ErrorBoundary from "./error-boundary";
 import { MetaPixelProvider } from "./meta-pixel-provider";
 import { AnalyticsProvider } from "./analytics-provider";
+import { CelebrationProvider } from "./credits-celebration";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -12,7 +13,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <Suspense fallback={null}>
         <AnalyticsProvider>
           <MetaPixelProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <CelebrationProvider>{children}</CelebrationProvider>
+            </ToastProvider>
           </MetaPixelProvider>
         </AnalyticsProvider>
       </Suspense>
