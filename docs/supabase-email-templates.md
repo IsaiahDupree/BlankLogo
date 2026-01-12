@@ -222,3 +222,32 @@ To send emails from `@blanklogo.app`:
 
 4. Click **Verify** in Resend
 5. Update `FROM_EMAIL` in your environment variables
+
+---
+
+## Google OAuth Setup
+
+To enable "Sign in with Google":
+
+### 1. Create Google OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Navigate to **APIs & Services** → **Credentials**
+4. Click **Create Credentials** → **OAuth client ID**
+5. Select **Web application**
+6. Add authorized redirect URIs:
+   - `https://cwnayaqzslaukjlwkzlo.supabase.co/auth/v1/callback`
+   - `https://www.blanklogo.app/auth/callback` (for local testing: `http://localhost:3939/auth/callback`)
+7. Copy the **Client ID** and **Client Secret**
+
+### 2. Configure Supabase
+
+1. Go to **Supabase Dashboard** → **Authentication** → **Providers**
+2. Enable **Google**
+3. Paste your **Client ID** and **Client Secret**
+4. Save
+
+### 3. Test
+
+Visit `/login` or `/signup` and click "Continue with Google"
