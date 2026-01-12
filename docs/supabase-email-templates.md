@@ -206,22 +206,64 @@ Your BlankLogo sign-in link
 
 ---
 
-## Resend Domain Setup
+## Resend Domain Setup + Supabase SMTP Integration
 
-To send emails from `@blanklogo.app`:
+To send Supabase auth emails (confirmation, password reset, etc.) through Resend from `@blanklogo.app`:
 
-1. Go to **Resend Dashboard** → **Domains** → **Add Domain**
+### Step 1: Verify Domain in Resend
+
+1. Go to **[Resend Dashboard → Domains](https://resend.com/domains)** → **Add Domain**
 2. Enter: `blanklogo.app`
-3. Add these DNS records to your registrar:
+3. Add these DNS records to your domain registrar (GoDaddy, Namecheap, etc.):
 
 | Type | Name | Value |
 |------|------|-------|
 | TXT | `@` | `v=spf1 include:amazonses.com ~all` |
-| CNAME | `resend._domainkey` | *(provided by Resend)* |
+| CNAME | `resend._domainkey` | *(Resend will provide this specific value)* |
 | TXT | `_dmarc` | `v=DMARC1; p=none;` |
 
-4. Click **Verify** in Resend
-5. Update `FROM_EMAIL` in your environment variables
+4. Click **Verify** in Resend (may take 5-10 minutes)
+
+### Step 2: Get Resend SMTP Credentials
+
+Go to **[Resend Settings → SMTP](https://resend.com/settings/smtp)** and note:
+
+| Setting | Value |
+|---------|-------|
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | *(Your Resend API Key - get from [API Keys](https://resend.com/api-keys))* |
+
+### Step 3: Configure Supabase Custom SMTP
+
+1. Go to **[Supabase Dashboard → Project Settings → Authentication](https://supabase.com/dashboard/project/cwnayaqzslaukjlwkzlo/settings/auth)**
+2. Scroll to **SMTP Settings** section
+3. Toggle **Enable Custom SMTP** ON
+4. Fill in:
+
+| Field | Value |
+|-------|-------|
+| Sender email | `hello@blanklogo.app` |
+| Sender name | `BlankLogo` |
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | *(Your Resend API Key)* |
+
+5. Click **Save**
+
+### Step 4: Apply Email Templates
+
+1. Go to **[Supabase → Authentication → Email Templates](https://supabase.com/dashboard/project/cwnayaqzslaukjlwkzlo/auth/templates)**
+2. For each template (Confirm signup, Reset password, etc.):
+   - Copy the **Subject** from this document
+   - Copy the **HTML Body** from this document
+   - Click **Save**
+
+### Step 5: Test
+
+Send a test signup or password reset - emails should now come from `hello@blanklogo.app` with your branded templates!
 
 ---
 
