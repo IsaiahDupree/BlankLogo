@@ -240,8 +240,15 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-6 py-8 border-t border-white/10 text-center text-gray-500">
-        <p>&copy; {new Date().getFullYear()} BlankLogo. All rights reserved.</p>
+      <footer className="container mx-auto px-6 py-12 border-t border-white/10">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-gray-500">&copy; {new Date().getFullYear()} BlankLogo. All rights reserved.</p>
+          <div className="flex gap-6 text-sm text-gray-400">
+            <Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
+            <a href="mailto:support@blanklogo.app" className="hover:text-white transition">Contact</a>
+          </div>
+        </div>
       </footer>
     </main>
   );
