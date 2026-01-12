@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Download, Play, RotateCcw, Eye } from "lucide-react";
+import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Download, Play, RotateCcw, Eye, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 import { trackGenerateRequested, trackMediaReady, trackDownload } from "@/lib/meta-pixel";
@@ -74,6 +74,8 @@ export default function RemoveWatermarkPage() {
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "error">("connected");
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const router = useRouter();
   const toast = useToast();
 
@@ -104,6 +106,8 @@ export default function RemoveWatermarkPage() {
         const data = await res.json();
         const job = data.job || data;
         setJobStatus(job);
+        setConnectionStatus("connected");
+        setConsecutiveFailures(0);
         
         // Get progress and step from API response
         const progress = job.progress || 0;
@@ -190,14 +194,36 @@ export default function RemoveWatermarkPage() {
           statusText: res.statusText,
           error: errorData.error || errorData.message || "Unknown error"
         });
+        
+        // Track consecutive failures for 404 errors (job not in database)
+        if (res.status === 404) {
+          setConsecutiveFailures(prev => {
+            const newCount = prev + 1;
+            if (newCount >= 5) {
+              setConnectionStatus("error");
+              // After 10 failures, show error to user
+              if (newCount >= 10) {
+                setError("Job tracking disconnected. The job may still be processing - check 'My Jobs' page or try again.");
+                setIsProcessing(false);
+              }
+            } else {
+              setConnectionStatus("disconnected");
+            }
+            return newCount;
+          });
+        }
       }
     } catch (err) {
-      // Don't show "Failed to fetch" as an error banner - it's a transient network issue
-      // Just log it and let the next poll retry
+      // Track network failures
+      setConsecutiveFailures(prev => {
+        const newCount = prev + 1;
+        if (newCount >= 3) {
+          setConnectionStatus("disconnected");
+        }
+        return newCount;
+      });
       console.log("%c⚠️ Network hiccup during poll (will retry)", "color: orange; font-weight: bold;");
       logRemove("⚠️ Poll network issue (retrying):", err instanceof Error ? err.message : err);
-      // Don't set error state for transient network issues during polling
-      // The next poll will retry automatically
     }
   }, [supabase, toast]);
 
@@ -440,6 +466,32 @@ export default function RemoveWatermarkPage() {
               <p className="text-gray-400">
                 This usually takes 30-60 seconds
               </p>
+              
+              {/* Connection Status Indicator */}
+              <div className={`mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+                connectionStatus === "connected" 
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : connectionStatus === "disconnected"
+                    ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                    : "bg-red-500/20 text-red-400 border border-red-500/30"
+              }`}>
+                {connectionStatus === "connected" ? (
+                  <>
+                    <Wifi className="w-3 h-3" />
+                    Connected
+                  </>
+                ) : connectionStatus === "disconnected" ? (
+                  <>
+                    <WifiOff className="w-3 h-3 animate-pulse" />
+                    Reconnecting... ({consecutiveFailures})
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3 h-3" />
+                    Connection Lost
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
