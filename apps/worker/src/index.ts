@@ -1076,6 +1076,11 @@ async function processJob(job: Job<JobData>): Promise<void> {
     console.log(`[Worker] ✅ Input info saved: ${inputFilename}`);
   }
 
+  // Send job started email notification
+  if (job.data.userId) {
+    await notifyJobStarted(job.data.userId, jobId, job.data.platform || 'video');
+  }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `blanklogo-${jobId}-`));
   const inputPath = path.join(tmpDir, "input.mp4");
   // Ensure output filename always has .mp4 extension
