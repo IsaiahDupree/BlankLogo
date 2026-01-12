@@ -117,26 +117,75 @@ export default function PromoPage() {
   if (success) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white flex items-center justify-center p-6">
-        <div className="w-full max-w-md text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center animate-bounce">
+        <div className="w-full max-w-lg text-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
             <CheckCircle className="w-10 h-10 text-green-400" />
           </div>
-          <h1 className="text-3xl font-bold mb-4">You&apos;re Almost There!</h1>
-          <p className="text-gray-400 mb-6">
-            We sent a confirmation link to <strong className="text-white">{email}</strong>.
+          <h1 className="text-3xl font-bold mb-2">Account Created!</h1>
+          <p className="text-xl text-indigo-400 font-semibold mb-6">
+            Just 3 quick steps to get your free credits
           </p>
-          <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 mb-6">
-            <div className="flex items-center justify-center gap-2 text-indigo-300 mb-2">
-              <Gift className="w-5 h-5" />
-              <span className="font-semibold">Your 10 FREE credits are waiting!</span>
+
+          {/* Step-by-step instructions */}
+          <div className="text-left space-y-4 mb-8">
+            <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-lg">
+                1
+              </div>
+              <div>
+                <p className="font-semibold text-white">Check Your Email</p>
+                <p className="text-sm text-gray-400">
+                  We sent a confirmation link to <strong className="text-indigo-300">{email}</strong>
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-gray-400">
-              Click the link in your email to activate your account and claim your credits.
+
+            <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-lg">
+                2
+              </div>
+              <div>
+                <p className="font-semibold text-white">Click the Confirmation Link</p>
+                <p className="text-sm text-gray-400">
+                  This verifies your email and activates your account
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-lg">
+                3
+              </div>
+              <div>
+                <p className="font-semibold text-white">Sign In & Start Removing Watermarks</p>
+                <p className="text-sm text-gray-400">
+                  Your <strong className="text-green-400">20 free credits</strong> will be ready to use immediately
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Credits waiting banner */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 mb-6">
+            <div className="flex items-center justify-center gap-2 text-green-400 mb-1">
+              <Gift className="w-5 h-5" />
+              <span className="font-bold text-lg">20 Credits = 20 Watermark Removals</span>
+            </div>
+            <p className="text-sm text-gray-300">
+              Remove watermarks from Sora, Runway, Pika, Kling, TikTok & more
             </p>
           </div>
-          <p className="text-gray-500 text-sm">
-            Check your spam folder if you don&apos;t see the email within a few minutes.
+
+          <p className="text-gray-500 text-sm mb-4">
+            💡 <strong>Tip:</strong> Check your spam/promotions folder if you don&apos;t see the email
           </p>
+
+          <Link 
+            href="/login"
+            className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-medium"
+          >
+            Already confirmed? Sign in here →
+          </Link>
         </div>
       </main>
     );
@@ -145,78 +194,96 @@ export default function PromoPage() {
   if (!showForm) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white flex items-center justify-center p-6 overflow-hidden">
-        <div className="w-full max-w-lg text-center relative">
+        <div className="w-full max-w-2xl text-center relative">
           {/* Animated background elements */}
           <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
 
-          {/* Gift icon with glow */}
-          <div className="relative mb-8">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-32 h-32 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full blur-2xl opacity-50 animate-pulse" />
-            </div>
-            <div className="relative w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-indigo-500/30 animate-bounce">
-              <Gift className="w-12 h-12 text-white" />
-            </div>
-          </div>
-
-          {/* Congratulations message */}
+          {/* Problem-aware headline */}
           <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 text-green-400 text-sm font-medium mb-4">
-              <Sparkles className="w-4 h-4" />
-              EXCLUSIVE OFFER
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 text-red-400 text-sm font-medium mb-4">
+              <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+              Tired of AI watermarks ruining your videos?
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-bold mb-4 bg-gradient-to-r from-white via-indigo-200 to-purple-200 bg-clip-text text-transparent">
-              Congratulations!
+            <h1 className="text-4xl sm:text-5xl font-bold mb-4 bg-gradient-to-r from-white via-indigo-200 to-purple-200 bg-clip-text text-transparent leading-tight">
+              Remove AI Watermarks<br />
+              <span className="text-3xl sm:text-4xl">in Under 60 Seconds</span>
             </h1>
 
-            <p className="text-xl text-gray-300 mb-2">You&apos;ve unlocked</p>
+            <p className="text-lg text-gray-300 mb-6 max-w-xl mx-auto">
+              Stop cropping, blurring, or re-generating. Our AI automatically removes watermarks from <strong className="text-white">Sora, Runway, Pika, Kling, TikTok</strong> and more — with professional-quality results.
+            </p>
 
-            <div className="text-6xl sm:text-7xl font-black bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-              20 FREE
+            {/* Gift banner */}
+            <div className="relative mb-8">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-full h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur-xl opacity-30 animate-pulse" />
+              </div>
+              <div className="relative p-6 rounded-2xl bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-500/30">
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <Gift className="w-8 h-8 text-yellow-400" />
+                  <span className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                    20 FREE Credits
+                  </span>
+                </div>
+                <p className="text-indigo-200">
+                  That&apos;s 20 watermark removals — completely free, no credit card required
+                </p>
+              </div>
             </div>
 
-            <p className="text-2xl text-white font-semibold mb-2">Credits</p>
-            
-            <p className="text-sm text-green-400 mb-6">
-              10 welcome credits + 10 bonus credits from this offer!
-            </p>
-
-            <p className="text-gray-400 mb-8 max-w-md mx-auto">
-              Remove AI watermarks from your Sora, Runway, Pika, and Kling videos - completely free. No credit card required.
-            </p>
+            {/* How it works - 3 steps preview */}
+            <div className="mb-8">
+              <p className="text-sm text-gray-500 uppercase tracking-wider mb-4">How to get your free credits</p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10">
+                  <span className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span>Sign up free</span>
+                </div>
+                <span className="hidden sm:block text-gray-600">→</span>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10">
+                  <span className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold">2</span>
+                  <span>Confirm email</span>
+                </div>
+                <span className="hidden sm:block text-gray-600">→</span>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10">
+                  <span className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold">3</span>
+                  <span>Start removing!</span>
+                </div>
+              </div>
+            </div>
 
             {/* Value proposition */}
             <div className="grid grid-cols-3 gap-4 mb-8">
               <div className="p-3 rounded-xl bg-white/5 border border-white/10">
                 <Zap className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-300">Instant</p>
+                <p className="text-sm text-gray-300">60 Seconds</p>
                 <p className="text-xs text-gray-500">Processing</p>
               </div>
               <div className="p-3 rounded-xl bg-white/5 border border-white/10">
                 <Sparkles className="w-6 h-6 text-indigo-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-300">AI-Powered</p>
-                <p className="text-xs text-gray-500">Inpainting</p>
+                <p className="text-sm text-gray-300">AI Inpainting</p>
+                <p className="text-xs text-gray-500">Seamless Results</p>
               </div>
               <div className="p-3 rounded-xl bg-white/5 border border-white/10">
                 <CheckCircle className="w-6 h-6 text-green-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-300">No Watermark</p>
-                <p className="text-xs text-gray-500">On Output</p>
+                <p className="text-sm text-gray-300">Clean Output</p>
+                <p className="text-xs text-gray-500">No New Watermarks</p>
               </div>
             </div>
 
             {/* CTA Button */}
             <button
               onClick={() => setShowForm(true)}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition font-bold text-lg shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 mx-auto group"
+              className="w-full sm:w-auto px-10 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition font-bold text-lg shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 mx-auto group"
             >
               <Gift className="w-5 h-5 group-hover:animate-bounce" />
-              Claim Your 20 Free Credits
+              Get My 20 Free Credits
             </button>
 
             <p className="text-gray-500 text-sm mt-4">
-              Limited time offer - Sign up now!
+              ✓ No credit card required &nbsp;•&nbsp; ✓ Cancel anytime &nbsp;•&nbsp; ✓ Instant access
             </p>
           </div>
         </div>
