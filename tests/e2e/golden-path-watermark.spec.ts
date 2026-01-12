@@ -94,8 +94,13 @@ test.describe('Golden Path - Watermark Removal', () => {
     // Step 6: Submit job
     console.log('\n[STEP 6] Submitting watermark removal job...');
     
-    // Find and click the submit/remove button
-    const submitButton = page.locator('button:has-text("Remove"), button:has-text("Start"), button:has-text("Process")').first();
+    // Wait for the Remove Watermark button to be visible and enabled
+    const submitButton = page.locator('button:has-text("Remove Watermark")').first();
+    await submitButton.waitFor({ state: 'visible', timeout: 10000 });
+    
+    // Small delay to ensure file is fully processed
+    await page.waitForTimeout(1000);
+    
     await submitButton.click();
     console.log('[STEP 6] ✅ Job submitted');
 

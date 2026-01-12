@@ -1266,7 +1266,7 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
     });
 
     // Store job in database with user_id and credits
-    await supabase.from('bl_jobs').insert({
+    const { error: insertError } = await supabase.from('bl_jobs').insert({
       id: jobId,
       user_id: userId,
       status: 'queued',
@@ -1279,6 +1279,14 @@ app.post('/api/v1/jobs/upload', authenticateToken, jobsRateLimiter, upload.singl
       webhook_url: webhook_url,
       credits_required: creditsRequired,
     });
+
+    if (insertError) {
+      console.error('[API] ❌ Error inserting job:', insertError);
+      console.error('[API] ❌ Insert error details:', JSON.stringify(insertError, null, 2));
+      return res.status(500).json({ error: 'Failed to create job', details: insertError.message });
+    }
+    
+    console.log(`[API] ✅ Job ${jobId} inserted into database`);
 
     // Reserve credits for this job using helper
     if (userId) {
