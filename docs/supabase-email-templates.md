@@ -251,3 +251,179 @@ To enable "Sign in with Google":
 ### 3. Test
 
 Visit `/login` or `/signup` and click "Continue with Google"
+
+---
+
+## 4. Invite User Email
+
+**Subject:**
+```
+You've been invited to join BlankLogo!
+```
+
+**Body (HTML):**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 14px; line-height: 56px; color: white; font-weight: bold; font-size: 28px;">B</div>
+      <h1 style="color: white; margin: 16px 0 0 0; font-size: 28px;">You're Invited!</h1>
+    </div>
+    
+    <!-- Content -->
+    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; margin-bottom: 24px;">
+      <p style="color: #e2e8f0; font-size: 18px; line-height: 1.6; margin: 0 0 20px 0; text-align: center;">
+        You've been invited to join BlankLogo - the fastest way to remove AI watermarks from your videos.
+      </p>
+      
+      <!-- Benefits -->
+      <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15)); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <p style="color: #a5b4fc; font-size: 14px; margin: 0 0 12px 0;">What you'll get:</p>
+        <ul style="color: #e2e8f0; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+          <li>10 free credits to remove watermarks</li>
+          <li>Support for Sora, Runway, Pika, Kling & more</li>
+          <li>AI-powered inpainting for seamless results</li>
+        </ul>
+      </div>
+      
+      <a href="{{ .ConfirmationURL }}" style="display: block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; text-decoration: none; padding: 18px 32px; border-radius: 12px; font-weight: 600; font-size: 18px; text-align: center; margin-bottom: 16px;">
+        Accept Invitation →
+      </a>
+      
+      <p style="color: #64748b; font-size: 13px; text-align: center; margin: 0;">
+        This invitation expires in 24 hours.
+      </p>
+    </div>
+    
+    <!-- Footer -->
+    <div style="text-align: center; color: #64748b; font-size: 12px;">
+      <p style="margin: 0 0 8px 0;">© 2026 BlankLogo by Dupree Ops LLC</p>
+      <p style="margin: 0;">Questions? Contact support@blanklogo.app</p>
+    </div>
+  </div>
+</body>
+</html>
+```
+
+---
+
+## 5. Change Email Address Email
+
+**Subject:**
+```
+Confirm your new email address for BlankLogo
+```
+
+**Body (HTML):**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 14px; line-height: 56px; color: white; font-weight: bold; font-size: 28px;">B</div>
+      <h1 style="color: white; margin: 16px 0 0 0; font-size: 24px;">Confirm Your New Email</h1>
+    </div>
+    
+    <!-- Content -->
+    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; margin-bottom: 24px;">
+      <p style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        You requested to change your email address for your BlankLogo account. Click the button below to confirm this change:
+      </p>
+      
+      <a href="{{ .ConfirmationURL }}" style="display: block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; text-align: center; margin-bottom: 20px;">
+        Confirm New Email Address
+      </a>
+      
+      <p style="color: #64748b; font-size: 13px; text-align: center; margin: 0 0 20px 0;">
+        Button not working? Copy this link: {{ .ConfirmationURL }}
+      </p>
+      
+      <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+        <p style="color: #fbbf24; font-size: 13px; margin: 0;">
+          ⚠️ If you didn't request this change, please ignore this email and your email will remain unchanged.
+        </p>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div style="text-align: center; color: #64748b; font-size: 12px;">
+      <p style="margin: 0 0 8px 0;">© 2026 BlankLogo by Dupree Ops LLC</p>
+      <p style="margin: 0;">Need help? Contact support@blanklogo.app</p>
+    </div>
+  </div>
+</body>
+</html>
+```
+
+---
+
+## 6. Reauthentication Email
+
+**Subject:**
+```
+Confirm your identity for BlankLogo
+```
+
+**Body (HTML):**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 14px; line-height: 56px; color: white; font-weight: bold; font-size: 28px;">B</div>
+      <h1 style="color: white; margin: 16px 0 0 0; font-size: 24px;">Confirm Your Identity</h1>
+    </div>
+    
+    <!-- Content -->
+    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; margin-bottom: 24px;">
+      <p style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        We need to verify your identity before you can complete a sensitive action on your BlankLogo account.
+      </p>
+      
+      <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+        Click the button below to confirm it's you:
+      </p>
+      
+      <a href="{{ .ConfirmationURL }}" style="display: block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; text-align: center; margin-bottom: 20px;">
+        Verify My Identity
+      </a>
+      
+      <p style="color: #64748b; font-size: 13px; text-align: center; margin: 0 0 20px 0;">
+        This link expires in 10 minutes.
+      </p>
+      
+      <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+        <p style="color: #f87171; font-size: 13px; margin: 0;">
+          🔒 If you didn't initiate this action, someone may be trying to access your account. Please change your password immediately.
+        </p>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div style="text-align: center; color: #64748b; font-size: 12px;">
+      <p style="margin: 0 0 8px 0;">© 2026 BlankLogo by Dupree Ops LLC</p>
+      <p style="margin: 0;">Security concerns? Contact support@blanklogo.app</p>
+    </div>
+  </div>
+</body>
+</html>
+```
