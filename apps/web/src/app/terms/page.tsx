@@ -88,7 +88,7 @@ export default function TermsOfServicePage() {
             <li>Processing videos requires credits</li>
             <li>Credits can be purchased or earned through promotions</li>
             <li>Credits are non-refundable except where required by law</li>
-            <li>Unused credits do not expire</li>
+            <li>Unused credits roll over and do not expire</li>
           </ul>
 
           <h3 className="text-xl font-semibold mt-6 mb-3">B. Failed Jobs</h3>
@@ -121,9 +121,8 @@ export default function TermsOfServicePage() {
 
           <h2 className="text-2xl font-bold mt-8 mb-4">7. Data Retention</h2>
           <ul className="list-disc pl-6 space-y-2 text-gray-300">
-            <li>Uploaded videos and outputs are automatically deleted after <strong>7 days</strong> by default</li>
-            <li>Paid plans may extend download availability (30 or 90 days)</li>
-            <li>You can request earlier deletion by contacting us</li>
+            <li>Uploaded videos and outputs are automatically deleted after <strong>90 days</strong></li>
+            <li>You can delete your account and all data from within the app settings</li>
             <li>We may retain job metadata for analytics, security, and billing purposes</li>
           </ul>
 
@@ -169,7 +168,7 @@ export default function TermsOfServicePage() {
 
           <h2 className="text-2xl font-bold mt-8 mb-4">11. Termination</h2>
           <p className="text-gray-300">
-            We may suspend or terminate your account if you violate these Terms. You may delete your account at any time. Upon termination:
+            We may suspend or terminate your account if you violate these Terms. You may delete your account at any time from your account settings in the app. Upon termination:
           </p>
           <ul className="list-disc pl-6 space-y-2 text-gray-300">
             <li>Your right to use the Service ends immediately</li>
@@ -203,15 +202,17 @@ export default function TermsOfServicePage() {
 
           <h2 className="text-2xl font-bold mt-8 mb-4">14. Governing Law</h2>
           <p className="text-gray-300">
-            These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict of law principles. Any disputes shall be resolved in the courts of Delaware.
+            These Terms are governed by the laws of the State of Florida, United States, without regard to conflict of law principles. Any disputes shall be resolved in the courts of Florida.
           </p>
 
           <hr className="border-gray-700 my-8" />
 
           <h2 className="text-2xl font-bold mt-8 mb-4">15. Contact Us</h2>
           <div className="bg-gray-800/50 rounded-lg p-6 mt-4">
-            <p className="text-white font-semibold text-lg mb-4">BlankLogo</p>
+            <p className="text-white font-semibold text-lg mb-4">Dupree Ops LLC (d/b/a BlankLogo)</p>
             <p className="text-gray-300">
+              3425 Delaney Drive<br />
+              Florida, USA<br /><br />
               Email: <a href="mailto:support@blanklogo.app" className="text-indigo-400 hover:text-indigo-300">support@blanklogo.app</a><br />
               Legal: <a href="mailto:legal@blanklogo.app" className="text-indigo-400 hover:text-indigo-300">legal@blanklogo.app</a>
             </p>

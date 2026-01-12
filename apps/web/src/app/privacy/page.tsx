@@ -139,7 +139,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Database / authentication:</strong> Supabase</li>
             <li><strong>Payment processors:</strong> Stripe</li>
             <li><strong>Email delivery:</strong> Resend</li>
-            <li><strong>Analytics providers:</strong> PostHog, Meta Pixel</li>
+            <li><strong>Analytics providers:</strong> PostHog, Meta Pixel (including retargeting)</li>
             <li><strong>Error monitoring:</strong> Application logging services</li>
           </ul>
 
@@ -169,11 +169,10 @@ export default function PrivacyPolicyPage() {
           <h3 className="text-xl font-semibold mt-6 mb-3">B. Retention</h3>
           <ul className="list-disc pl-6 space-y-2 text-gray-300">
             <li>Uploaded videos and generated outputs are stored temporarily to provide the Service and allow download.</li>
-            <li><strong>Default retention:</strong> Videos and outputs are automatically deleted after <strong>7 days</strong>.</li>
-            <li>Paid plans may extend download link availability (e.g., 30 or 90 days).</li>
+            <li><strong>Retention:</strong> Videos and outputs are automatically deleted after <strong>90 days</strong>.</li>
             <li>Job logs/metadata (non-video) may be retained longer for security, analytics, billing, and reliability.</li>
           </ul>
-          <p className="text-gray-300 mt-2">You can request earlier deletion by contacting us (see Section 10).</p>
+          <p className="text-gray-300 mt-2">You can delete your account and all associated data from within the app settings, or by contacting us (see Section 10).</p>
 
           <h3 className="text-xl font-semibold mt-6 mb-3">C. Access controls</h3>
           <p className="text-gray-300">We limit internal access to User Content and apply access controls designed to prevent unauthorized access.</p>
@@ -226,7 +225,8 @@ export default function PrivacyPolicyPage() {
 
           <h3 className="text-xl font-semibold mt-6 mb-3">How to exercise rights</h3>
           <p className="text-gray-300">
-            Email us at: <a href="mailto:privacy@blanklogo.app" className="text-indigo-400 hover:text-indigo-300">privacy@blanklogo.app</a><br />
+            <strong>Delete your account:</strong> You can delete your account and all associated data directly from your account settings in the app.<br /><br />
+            <strong>Other requests:</strong> Email us at <a href="mailto:privacy@blanklogo.app" className="text-indigo-400 hover:text-indigo-300">privacy@blanklogo.app</a><br />
             Include: your account email, the request type, and any relevant details.
           </p>
           <p className="text-gray-400 text-sm mt-2">We may need to verify your identity before fulfilling requests.</p>
@@ -267,8 +267,10 @@ export default function PrivacyPolicyPage() {
 
           <h2 className="text-2xl font-bold mt-8 mb-4">15) Contact Us</h2>
           <div className="bg-gray-800/50 rounded-lg p-6 mt-4">
-            <p className="text-white font-semibold text-lg mb-4">BlankLogo</p>
+            <p className="text-white font-semibold text-lg mb-4">Dupree Ops LLC (d/b/a BlankLogo)</p>
             <p className="text-gray-300">
+              3425 Delaney Drive<br />
+              Florida, USA<br /><br />
               Email: <a href="mailto:privacy@blanklogo.app" className="text-indigo-400 hover:text-indigo-300">privacy@blanklogo.app</a><br />
               Support: <a href="mailto:support@blanklogo.app" className="text-indigo-400 hover:text-indigo-300">support@blanklogo.app</a>
             </p>
