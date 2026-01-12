@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import multer from 'multer';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
@@ -324,6 +325,12 @@ const supabase = createClient(
   process.env.SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_KEY || ''
 );
+
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+}));
 
 // CORS - allow all origins (fixed 2026-01-08)
 app.use(cors({

@@ -45,7 +45,7 @@ services:
       - key: INPAINT_PORT
         value: 8081
       - key: PRELOAD_MODELS
-        value: "false"
+        value: "true"
 
   # Background Worker
   - type: worker
