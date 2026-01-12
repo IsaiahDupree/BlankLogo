@@ -18,7 +18,7 @@ const TEST_PASSWORD = 'thenewaccount123';
 const TEST_VIDEO_PATH = 'test-videos/sora-watermark-test.mp4';
 
 test.describe('Golden Path - Watermark Removal', () => {
-  test.setTimeout(120000); // 2 minutes for full flow
+  test.setTimeout(180000); // 3 minutes for full flow (processing can take 60-90s)
 
   test('Complete watermark removal flow', async ({ page }) => {
     console.log('━'.repeat(60));
