@@ -71,6 +71,9 @@ importers:
       express:
         specifier: ^4.18.2
         version: 4.22.1
+      helmet:
+        specifier: ^8.0.0
+        version: 8.1.0
       ioredis:
         specifier: ^5.3.2
         version: 5.8.2
@@ -90,6 +93,9 @@ importers:
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
+      '@types/helmet':
+        specifier: ^4.0.0
+        version: 4.0.0
       '@types/multer':
         specifier: ^1.4.11
         version: 1.4.13
@@ -120,6 +126,12 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.89.0
+      '@types/canvas-confetti':
+        specifier: ^1.9.0
+        version: 1.9.0
+      canvas-confetti:
+        specifier: ^1.9.4
+        version: 1.9.4
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -883,6 +895,9 @@ packages:
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
 
+  '@types/canvas-confetti@1.9.0':
+    resolution: {integrity: sha512-aBGj/dULrimR1XDZLtG9JwxX1b4HPRF6CX9Yfwh3NvstZEm1ZL7RBnel4keCPSqs1ANRu1u2Aoz9R+VmtjYuTg==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -909,6 +924,10 @@ packages:
 
   '@types/express@4.17.25':
     resolution: {integrity: sha512-dVd04UKsfpINUnK0yBoYHDF3xu7xVH4BuDotC/xGuycx4CgbP48X/KF/586bcObxT0HENHXEU8Nqtu6NR+eKhw==}
+
+  '@types/helmet@4.0.0':
+    resolution: {integrity: sha512-ONIn/nSNQA57yRge3oaMQESef/6QhoeX7llWeDli0UZIfz8TQMkfNPTXA8VnnyeA1WUjG2pGqdjEIueYonMdfQ==}
+    deprecated: This is a stub types definition. helmet provides its own type definitions, so you do not need this installed.
 
   '@types/http-errors@2.0.5':
     resolution: {integrity: sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==}
@@ -1467,6 +1486,9 @@ packages:
 
   caniuse-lite@1.0.30001762:
     resolution: {integrity: sha512-PxZwGNvH7Ak8WX5iXzoK1KPZttBXNPuaOvI2ZYU7NrlM+d9Ov+TUvlLOBNGzVXAntMSMMlJPd+jY6ovrVjSmUw==}
+
+  canvas-confetti@1.9.4:
+    resolution: {integrity: sha512-yxQbJkAVrFXWNbTUjPqjF7G+g6pDotOUHGbkZq2NELZUMDpiJ85rIEazVb8GTaAptNW2miJAXbs1BtioA251Pw==}
 
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
@@ -2188,6 +2210,10 @@ packages:
 
   headers-polyfill@4.0.3:
     resolution: {integrity: sha512-IScLbePpkvO846sIwOtOTDjutRMWdXdJmXdMvk6gCBHxFO8d+QKOQedyZSxFTTFYRSmlgSTDtXqqq4pcenBXLQ==}
+
+  helmet@8.1.0:
+    resolution: {integrity: sha512-jOiHyAZsmnr8LqoPGmCjYAaiuWwjAPLgY8ZX2XrmHawt99/u1y6RgrZMTeoPfpUbV96HOalYgz1qzkRbw54Pmg==}
+    engines: {node: '>=18.0.0'}
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
@@ -4327,6 +4353,8 @@ snapshots:
       '@types/connect': 3.4.38
       '@types/node': 20.19.27
 
+  '@types/canvas-confetti@1.9.0': {}
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -4363,6 +4391,10 @@ snapshots:
       '@types/express-serve-static-core': 4.19.7
       '@types/qs': 6.14.0
       '@types/serve-static': 1.15.10
+
+  '@types/helmet@4.0.0':
+    dependencies:
+      helmet: 8.1.0
 
   '@types/http-errors@2.0.5': {}
 
@@ -4977,6 +5009,8 @@ snapshots:
   camelcase-css@2.0.1: {}
 
   caniuse-lite@1.0.30001762: {}
+
+  canvas-confetti@1.9.4: {}
 
   chai@6.2.2: {}
 
@@ -5893,6 +5927,8 @@ snapshots:
       function-bind: 1.1.2
 
   headers-polyfill@4.0.3: {}
+
+  helmet@8.1.0: {}
 
   html-escaper@2.0.2: {}
 
