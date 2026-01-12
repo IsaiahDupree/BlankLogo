@@ -174,10 +174,14 @@ export default function PromoPage() {
             <p className="text-xl text-gray-300 mb-2">You&apos;ve unlocked</p>
 
             <div className="text-6xl sm:text-7xl font-black bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-              10 FREE
+              20 FREE
             </div>
 
-            <p className="text-2xl text-white font-semibold mb-6">Credits</p>
+            <p className="text-2xl text-white font-semibold mb-2">Credits</p>
+            
+            <p className="text-sm text-green-400 mb-6">
+              10 welcome credits + 10 bonus credits from this offer!
+            </p>
 
             <p className="text-gray-400 mb-8 max-w-md mx-auto">
               Remove AI watermarks from your Sora, Runway, Pika, and Kling videos - completely free. No credit card required.
@@ -208,7 +212,7 @@ export default function PromoPage() {
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition font-bold text-lg shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 mx-auto group"
             >
               <Gift className="w-5 h-5 group-hover:animate-bounce" />
-              Claim Your Free Credits
+              Claim Your 20 Free Credits
             </button>
 
             <p className="text-gray-500 text-sm mt-4">
@@ -228,9 +232,9 @@ export default function PromoPage() {
         <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-center">
           <div className="flex items-center justify-center gap-2 text-indigo-300 mb-1">
             <Gift className="w-5 h-5" />
-            <span className="font-bold text-lg">10 FREE Credits Included!</span>
+            <span className="font-bold text-lg">20 FREE Credits Included!</span>
           </div>
-          <p className="text-sm text-gray-400">Create your account to claim</p>
+          <p className="text-sm text-gray-400">10 welcome + 10 bonus credits</p>
         </div>
 
         <div className="text-center mb-8">
@@ -304,7 +308,7 @@ export default function PromoPage() {
             ) : (
               <>
                 <Gift className="w-5 h-5" />
-                Create Account & Get 10 Credits
+                Create Account & Get 20 Credits
               </>
             )}
           </button>
