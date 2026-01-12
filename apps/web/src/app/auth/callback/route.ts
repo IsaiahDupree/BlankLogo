@@ -18,24 +18,28 @@ export async function GET(request: Request) {
       try {
         const adminSupabase = createAdminClient();
         
-        // Check if user already has any credits (to avoid duplicate grants)
+        // Check if user already has welcome bonus (to avoid duplicate grants)
         const { data: existingCredits } = await adminSupabase
-          .from('credit_ledger')
+          .from('bl_credit_ledger')
           .select('id')
           .eq('user_id', data.user.id)
-          .eq('type', 'signup_bonus')
+          .ilike('note', '%Welcome bonus%')
           .limit(1);
         
         if (!existingCredits || existingCredits.length === 0) {
           // Grant welcome credits to new user
-          await adminSupabase.from('credit_ledger').insert({
+          const { error: insertError } = await adminSupabase.from('bl_credit_ledger').insert({
             user_id: data.user.id,
-            type: 'signup_bonus',
+            type: 'bonus',
             amount: WELCOME_CREDITS,
             note: `Welcome bonus: ${WELCOME_CREDITS} free credits for signing up`,
           });
           
-          console.log(`[Auth Callback] Granted ${WELCOME_CREDITS} welcome credits to new user:`, data.user.id);
+          if (insertError) {
+            console.error('[Auth Callback] Insert error:', insertError);
+          } else {
+            console.log(`[Auth Callback] Granted ${WELCOME_CREDITS} welcome credits to new user:`, data.user.id);
+          }
         } else {
           console.log('[Auth Callback] User already has signup bonus, skipping');
         }
