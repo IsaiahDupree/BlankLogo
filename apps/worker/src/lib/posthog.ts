@@ -122,12 +122,12 @@ function capture(
 export const job = {
   /** Job dequeued by worker */
   dequeued: (props: CorrelationIds & { attempt: number }) => {
-    capture(props.user_id || 'system', 'job_dequeued', props);
+    capture(props.user_id || 'system', 'job_dequeued', { ...props });
   },
 
   /** Job dispatched to Modal */
   dispatched: (props: CorrelationIds & { provider: 'modal'; gpu_type?: string }) => {
-    capture(props.user_id || 'system', 'job_dispatched', props);
+    capture(props.user_id || 'system', 'job_dispatched', { ...props });
   },
 
   /** Job dispatch failed */
@@ -137,7 +137,7 @@ export const job = {
     error_code: ErrorCode;
     error_message?: string;
   }) => {
-    capture(props.user_id || 'system', 'job_dispatch_failed', props);
+    capture(props.user_id || 'system', 'job_dispatch_failed', { ...props });
   },
 
   /** Job started processing (Modal callback) */
@@ -147,30 +147,30 @@ export const job = {
 
   /** Job stage started */
   stageStarted: (props: CorrelationIds & { stage: string }) => {
-    capture(props.user_id || 'system', 'job_stage_started', props);
+    capture(props.user_id || 'system', 'job_stage_started', { ...props });
   },
 
   /** Job stage completed */
   stageCompleted: (props: CorrelationIds & { stage: string; duration_ms: number }) => {
-    capture(props.user_id || 'system', 'job_stage_completed', props);
+    capture(props.user_id || 'system', 'job_stage_completed', { ...props });
   },
 
   /** Job progress update */
   progress: (props: CorrelationIds & { percent: number; stage?: string }) => {
     // Sample progress: only send at 0, 25, 50, 75, 100
     if ([0, 25, 50, 75, 100].includes(props.percent)) {
-      capture(props.user_id || 'system', 'job_progress', props);
+      capture(props.user_id || 'system', 'job_progress', { ...props });
     }
   },
 
   /** Output upload started */
   outputUploadStarted: (props: CorrelationIds & { output_mb?: number }) => {
-    capture(props.user_id || 'system', 'job_output_upload_started', props);
+    capture(props.user_id || 'system', 'job_output_upload_started', { ...props });
   },
 
   /** Output upload completed */
   outputUploadCompleted: (props: CorrelationIds & { upload_ms: number; output_mb?: number }) => {
-    capture(props.user_id || 'system', 'job_output_upload_completed', props);
+    capture(props.user_id || 'system', 'job_output_upload_completed', { ...props });
   },
 
   /** Job completed successfully */
@@ -205,7 +205,7 @@ export const job = {
     backoff_ms: number; 
     reason: string 
   }) => {
-    capture(props.user_id || 'system', 'job_retry_scheduled', props);
+    capture(props.user_id || 'system', 'job_retry_scheduled', { ...props });
   },
 
   /** Dead lettered (max retries exceeded) */
@@ -213,7 +213,7 @@ export const job = {
     attempts: number; 
     final_error_code: ErrorCode 
   }) => {
-    capture(props.user_id || 'system', 'job_dead_lettered', props);
+    capture(props.user_id || 'system', 'job_dead_lettered', { ...props });
   },
 };
 
@@ -229,7 +229,7 @@ export const error = {
     error_code: ErrorCode;
     message?: string;
   }) => {
-    capture(props.user_id || 'system', 'error_worker', props);
+    capture(props.user_id || 'system', 'error_worker', { ...props });
   },
 
   /** Modal error */
@@ -240,7 +240,7 @@ export const error = {
     cold_start_ms?: number;
     message?: string;
   }) => {
-    capture(props.user_id || 'system', 'error_modal', props);
+    capture(props.user_id || 'system', 'error_modal', { ...props });
   },
 };
 
