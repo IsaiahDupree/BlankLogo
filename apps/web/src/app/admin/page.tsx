@@ -82,15 +82,15 @@ function StatCard({
   };
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="w-5 h-5" />
+    <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+        <div className={`p-1.5 sm:p-2 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
-        <h3 className="text-gray-400 text-sm font-medium">{title}</h3>
+        <h3 className="text-gray-400 text-xs sm:text-sm font-medium">{title}</h3>
       </div>
-      <p className="text-3xl font-bold">{value}</p>
-      {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+      <p className="text-2xl sm:text-3xl font-bold">{value}</p>
+      {subtitle && <p className="text-xs sm:text-sm text-gray-500 mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -330,20 +330,20 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Shield className="w-8 h-8 text-blue-400" />
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
+              <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
               Admin Dashboard
             </h1>
-            <p className="text-gray-400 mt-1">BlankLogo site statistics and metrics</p>
+            <p className="text-gray-400 mt-1 text-sm sm:text-base">BlankLogo site statistics</p>
           </div>
           <button
             onClick={fetchStats}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition w-full sm:w-auto"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
@@ -351,12 +351,12 @@ export default function AdminPage() {
         </div>
 
         {/* User Stats */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-400" />
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             Users
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <StatCard 
               title="Total Users" 
               value={stats?.users.total || 0} 
@@ -388,23 +388,25 @@ export default function AdminPage() {
         </section>
 
         {/* User Growth Chart */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-400" />
-            User Growth (Last 30 Days)
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+            <span className="hidden sm:inline">User Growth (Last 30 Days)</span>
+            <span className="sm:hidden">Growth (30d)</span>
           </h2>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
             <UserGrowthChart data={stats?.userGrowth || []} />
           </div>
         </section>
 
         {/* Retention & Engagement */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <RefreshCw className="w-5 h-5 text-purple-400" />
-            Retention & Engagement
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
+            <span className="hidden sm:inline">Retention & Engagement</span>
+            <span className="sm:hidden">Retention</span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <StatCard 
               title="Return Rate" 
               value={`${stats?.retention.returnRate7d || 0}%`} 
@@ -437,12 +439,12 @@ export default function AdminPage() {
         </section>
 
         {/* Job Stats */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Video className="w-5 h-5 text-purple-400" />
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <Video className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
             Jobs
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <StatCard 
               title="Total Jobs" 
               value={stats?.jobs.total || 0} 
@@ -470,7 +472,7 @@ export default function AdminPage() {
               color="yellow"
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
             <StatCard 
               title="Jobs Last 24h" 
               value={stats?.jobs.last24h || 0} 
@@ -487,12 +489,12 @@ export default function AdminPage() {
         </section>
 
         {/* Credits Stats */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-yellow-400" />
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
             Credits
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <StatCard 
               title="Total Granted" 
               value={stats?.credits.totalGranted || 0} 
@@ -518,12 +520,12 @@ export default function AdminPage() {
         </section>
 
         {/* Revenue Stats */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-400" />
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
             Revenue
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <StatCard 
               title="Total Revenue" 
               value={`$${(stats?.revenue.total || 0).toFixed(2)}`} 
@@ -553,11 +555,11 @@ export default function AdminPage() {
 
         {/* Service Health */}
         <section>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-400" />
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             Service Health
           </h2>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
             <ServiceHealthCheck />
           </div>
         </section>
@@ -744,7 +746,7 @@ function ServiceHealthCheck() {
           Check Now
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
         {services.map(({ name, key }) => {
           const service = health[key];
           const isHealthy = service?.status === "ok" || service?.status === "healthy";
@@ -868,25 +870,25 @@ function UserGrowthChart({ data }: { data: { date: string; count: number }[] }) 
   return (
     <div>
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="text-center">
-          <p className="text-2xl font-bold text-blue-400">{total}</p>
-          <p className="text-sm text-gray-400">Total (30d)</p>
+          <p className="text-lg sm:text-2xl font-bold text-blue-400">{total}</p>
+          <p className="text-xs sm:text-sm text-gray-400">Total (30d)</p>
         </div>
         <div className="text-center">
-          <p className="text-2xl font-bold text-green-400">{last7Total}</p>
-          <p className="text-sm text-gray-400">Last 7 Days</p>
+          <p className="text-lg sm:text-2xl font-bold text-green-400">{last7Total}</p>
+          <p className="text-xs sm:text-sm text-gray-400">Last 7 Days</p>
         </div>
         <div className="text-center">
-          <p className={`text-2xl font-bold ${growthRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`text-lg sm:text-2xl font-bold ${growthRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {growthRate >= 0 ? '+' : ''}{growthRate}%
           </p>
-          <p className="text-sm text-gray-400">Growth Rate</p>
+          <p className="text-xs sm:text-sm text-gray-400">Growth</p>
         </div>
       </div>
 
       {/* Bar Chart */}
-      <div className="flex items-end gap-1 h-40">
+      <div className="flex items-end gap-0.5 sm:gap-1 h-28 sm:h-40">
         {data.map((d, i) => {
           const height = maxCount > 0 ? (d.count / maxCount) * 100 : 0;
           const isLast7 = i >= data.length - 7;
