@@ -159,9 +159,9 @@ export default function AdminPage() {
   async function fetchStats() {
     setRefreshing(true);
     try {
-      // Fetch user stats (with email to filter test users)
+      // Fetch user stats from bl_user_profiles (with email to filter test users)
       const { data: allUsers } = await supabase
-        .from("bl_users")
+        .from("bl_user_profiles")
         .select("id, email, created_at");
 
       // Filter out test users
@@ -201,34 +201,39 @@ export default function AdminPage() {
       ).length || 0;
 
       // Fetch credit stats (filter out test users)
+      // bl_credit_ledger uses 'delta' for amount and 'reason' for type
       const { data: allCredits } = await supabase
         .from("bl_credit_ledger")
-        .select("user_id, amount, type");
+        .select("user_id, delta, reason, type, created_at");
       
       const credits = allCredits?.filter(c => !testUserIds.has(c.user_id)) || [];
 
-      const totalGranted = credits.filter(c => c.amount > 0 && c.type === "grant")
-        .reduce((sum, c) => sum + c.amount, 0);
-      const totalUsed = credits.filter(c => c.amount < 0)
-        .reduce((sum, c) => sum + Math.abs(c.amount), 0);
-      const totalPurchased = credits.filter(c => c.amount > 0 && c.type === "purchase")
-        .reduce((sum, c) => sum + c.amount, 0);
-
-      // Fetch revenue (filter out test users)
-      const { data: allTransactions } = await supabase
-        .from("bl_transactions")
-        .select("user_id, amount, type, created_at");
+      // delta > 0 = credits added, delta < 0 = credits used
+      // reason/type can be: 'grant', 'purchase', 'reserve', 'release', 'welcome', etc.
+      const totalGranted = credits.filter(c => 
+        (c.delta > 0 || (c.type && c.delta > 0)) && 
+        (c.reason === 'welcome' || c.reason === 'grant' || c.type === 'grant' || c.reason === 'promo')
+      ).reduce((sum, c) => sum + Math.abs(c.delta), 0);
       
-      const transactions = allTransactions?.filter(t => !testUserIds.has(t.user_id)) || [];
+      const totalUsed = credits.filter(c => 
+        c.delta < 0 && (c.reason === 'reserve' || c.type === 'reserve' || c.reason === 'job')
+      ).reduce((sum, c) => sum + Math.abs(c.delta), 0);
+      
+      const totalPurchased = credits.filter(c => 
+        c.delta > 0 && (c.reason === 'purchase' || c.type === 'purchase')
+      ).reduce((sum, c) => sum + Math.abs(c.delta), 0);
 
-      const totalRevenue = transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-      const revenueLast30d = transactions?.filter(t => 
-        new Date(t.created_at) > new Date(now.getTime() - 30 * day)
-      ).reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-      const subscriptionRevenue = transactions?.filter(t => t.type === "subscription")
-        .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-      const oneTimeRevenue = transactions?.filter(t => t.type === "one_time")
-        .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+      // Revenue: estimate from credit purchases (no separate transactions table)
+      // Assuming $1 per 10 credits as rough estimate, or use Stripe data if available
+      const CREDITS_PER_DOLLAR = 10;
+      const purchaseCredits = credits.filter(c => 
+        c.delta > 0 && (c.reason === 'purchase' || c.type === 'purchase')
+      );
+      
+      const totalRevenue = purchaseCredits.reduce((sum, c) => sum + (Math.abs(c.delta) / CREDITS_PER_DOLLAR), 0);
+      const revenueLast30d = purchaseCredits.filter(c => 
+        new Date(c.created_at) > new Date(now.getTime() - 30 * day)
+      ).reduce((sum, c) => sum + (Math.abs(c.delta) / CREDITS_PER_DOLLAR), 0);
 
       // Calculate user growth by day (last 30 days)
       const userGrowth: { date: string; count: number }[] = [];
@@ -314,10 +319,10 @@ export default function AdminPage() {
           totalPurchased,
         },
         revenue: {
-          total: totalRevenue / 100,
-          last30d: revenueLast30d / 100,
-          subscriptions: subscriptionRevenue / 100,
-          oneTime: oneTimeRevenue / 100,
+          total: totalRevenue,
+          last30d: revenueLast30d,
+          subscriptions: 0, // Would need Stripe integration for subscription tracking
+          oneTime: totalRevenue, // All credit purchases are one-time for now
         },
         userGrowth,
         retention: {

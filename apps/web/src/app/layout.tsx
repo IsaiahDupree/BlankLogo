@@ -7,6 +7,7 @@ import Providers from "@/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "10039038026189444";
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-XXXXXXXXXX";
 
 export const metadata: Metadata = {
   title: "BlankLogo - Remove Watermarks from AI Videos",
@@ -26,6 +27,22 @@ export default function RootLayout({
         <meta name="facebook-domain-verification" content="nk3uy34a0jkikq80nohcxwistxne25" />
       </head>
       <body className={inter.className}>
+        {/* Google Analytics */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_MEASUREMENT_ID}', {
+              page_title: document.title,
+              page_location: window.location.href,
+            });
+          `}
+        </Script>
         {/* Meta Pixel Base Code */}
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
