@@ -121,6 +121,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [includeTestUsers, setIncludeTestUsers] = useState(true); // Default to include all
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -130,6 +131,13 @@ export default function AdminPage() {
   useEffect(() => {
     checkAdminAccess();
   }, []);
+
+  // Re-fetch stats when toggle changes
+  useEffect(() => {
+    if (authorized) {
+      fetchStats();
+    }
+  }, [includeTestUsers]);
 
   async function checkAdminAccess() {
     try {
@@ -164,9 +172,13 @@ export default function AdminPage() {
         .from("bl_user_profiles")
         .select("id, email, created_at");
 
-      // Filter out test users
-      const users = allUsers?.filter(u => !isTestUser(u.email)) || [];
-      const testUserIds = new Set(allUsers?.filter(u => isTestUser(u.email)).map(u => u.id) || []);
+      // Filter out test users (unless includeTestUsers is true)
+      const users = includeTestUsers 
+        ? (allUsers || [])
+        : (allUsers?.filter(u => !isTestUser(u.email)) || []);
+      const testUserIds = includeTestUsers 
+        ? new Set<string>() 
+        : new Set(allUsers?.filter(u => isTestUser(u.email)).map(u => u.id) || []);
 
       const now = new Date();
       const day = 24 * 60 * 60 * 1000;
@@ -377,14 +389,26 @@ export default function AdminPage() {
             </h1>
             <p className="text-gray-400 mt-1 text-sm sm:text-base">BlankLogo site statistics</p>
           </div>
-          <button
-            onClick={fetchStats}
-            disabled={refreshing}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition w-full sm:w-auto"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Test Users Toggle */}
+            <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeTestUsers}
+                onChange={(e) => setIncludeTestUsers(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
+              />
+              Include test users
+            </label>
+            <button
+              onClick={fetchStats}
+              disabled={refreshing}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* User Stats */}
