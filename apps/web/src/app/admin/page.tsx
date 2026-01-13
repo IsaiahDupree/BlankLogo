@@ -566,17 +566,28 @@ export default function AdminPage() {
   );
 }
 
+interface ServiceHealthData {
+  status: string;
+  latency: number;
+  response?: Record<string, unknown>;
+  error?: string;
+  logs?: string[];
+}
+
 function ServiceHealthCheck() {
   const [health, setHealth] = useState<{
-    worker: { status: string; latency: number } | null;
-    modal: { status: string; latency: number } | null;
-    web: { status: string; latency: number } | null;
+    worker: ServiceHealthData | null;
+    modal: ServiceHealthData | null;
+    web: ServiceHealthData | null;
   }>({
     worker: null,
     modal: null,
     web: null,
   });
   const [checking, setChecking] = useState(false);
+  const [selectedService, setSelectedService] = useState<'worker' | 'modal' | 'web' | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   async function checkHealth() {
     setChecking(true);
@@ -586,9 +597,23 @@ function ServiceHealthCheck() {
       const start = Date.now();
       const res = await fetch("https://blanklogo-worker.onrender.com/health");
       const data = await res.json();
-      setHealth(h => ({ ...h, worker: { status: data.status, latency: Date.now() - start } }));
-    } catch {
-      setHealth(h => ({ ...h, worker: { status: "error", latency: 0 } }));
+      setHealth(h => ({ 
+        ...h, 
+        worker: { 
+          status: data.status, 
+          latency: Date.now() - start,
+          response: data,
+        } 
+      }));
+    } catch (err) {
+      setHealth(h => ({ 
+        ...h, 
+        worker: { 
+          status: "error", 
+          latency: 0,
+          error: err instanceof Error ? err.message : "Connection failed",
+        } 
+      }));
     }
 
     // Check Modal
@@ -596,21 +621,104 @@ function ServiceHealthCheck() {
       const start = Date.now();
       const res = await fetch("https://isaiahdupree33--blanklogo-watermark-removal-health.modal.run");
       const data = await res.json();
-      setHealth(h => ({ ...h, modal: { status: data.status, latency: Date.now() - start } }));
-    } catch {
-      setHealth(h => ({ ...h, modal: { status: "error", latency: 0 } }));
+      setHealth(h => ({ 
+        ...h, 
+        modal: { 
+          status: data.status, 
+          latency: Date.now() - start,
+          response: data,
+        } 
+      }));
+    } catch (err) {
+      setHealth(h => ({ 
+        ...h, 
+        modal: { 
+          status: "error", 
+          latency: 0,
+          error: err instanceof Error ? err.message : "Connection failed",
+        } 
+      }));
     }
 
     // Check Web
     try {
       const start = Date.now();
       const res = await fetch("https://www.blanklogo.app");
-      setHealth(h => ({ ...h, web: { status: res.ok ? "ok" : "error", latency: Date.now() - start } }));
-    } catch {
-      setHealth(h => ({ ...h, web: { status: "error", latency: 0 } }));
+      setHealth(h => ({ 
+        ...h, 
+        web: { 
+          status: res.ok ? "ok" : "error", 
+          latency: Date.now() - start,
+          response: { statusCode: res.status, statusText: res.statusText },
+        } 
+      }));
+    } catch (err) {
+      setHealth(h => ({ 
+        ...h, 
+        web: { 
+          status: "error", 
+          latency: 0,
+          error: err instanceof Error ? err.message : "Connection failed",
+        } 
+      }));
     }
 
     setChecking(false);
+  }
+
+  async function fetchLogs(service: 'worker' | 'modal' | 'web') {
+    setSelectedService(service);
+    setLoadingLogs(true);
+    setLogs([]);
+
+    const timestamp = new Date().toISOString();
+    const newLogs: string[] = [
+      `[${timestamp}] Fetching logs for ${service}...`,
+    ];
+
+    try {
+      if (service === 'worker') {
+        // Fetch worker health with more details
+        const res = await fetch("https://blanklogo-worker.onrender.com/health");
+        const data = await res.json();
+        newLogs.push(`[${timestamp}] Worker Status: ${data.status}`);
+        newLogs.push(`[${timestamp}] Worker ID: ${data.worker || 'unknown'}`);
+        newLogs.push(`[${timestamp}] Run ID: ${data.run_id || 'unknown'}`);
+        newLogs.push(`[${timestamp}] Uptime: ${data.uptime_ms ? `${Math.round(data.uptime_ms / 1000)}s` : 'unknown'}`);
+        newLogs.push(`[${timestamp}] Timestamp: ${data.timestamp || timestamp}`);
+        
+        // Try to get queue stats
+        try {
+          const queueRes = await fetch("https://blanklogo-worker.onrender.com/queue/stats");
+          if (queueRes.ok) {
+            const queueData = await queueRes.json();
+            newLogs.push(`[${timestamp}] Queue Pending: ${queueData.pending || 0}`);
+            newLogs.push(`[${timestamp}] Queue Processing: ${queueData.processing || 0}`);
+          }
+        } catch {
+          newLogs.push(`[${timestamp}] Queue stats not available`);
+        }
+      } else if (service === 'modal') {
+        const res = await fetch("https://isaiahdupree33--blanklogo-watermark-removal-health.modal.run");
+        const data = await res.json();
+        newLogs.push(`[${timestamp}] Modal Status: ${data.status}`);
+        newLogs.push(`[${timestamp}] Service: ${data.service || 'blanklogo-watermark-removal'}`);
+        newLogs.push(`[${timestamp}] GPU Available: Yes (on-demand)`);
+        newLogs.push(`[${timestamp}] Cold start expected: ~4-10s`);
+      } else if (service === 'web') {
+        const res = await fetch("https://www.blanklogo.app");
+        newLogs.push(`[${timestamp}] Web Status: ${res.ok ? 'OK' : 'Error'}`);
+        newLogs.push(`[${timestamp}] HTTP Code: ${res.status}`);
+        newLogs.push(`[${timestamp}] Status Text: ${res.statusText}`);
+        newLogs.push(`[${timestamp}] Response Time: ${health.web?.latency || 0}ms`);
+      }
+    } catch (err) {
+      newLogs.push(`[${timestamp}] ERROR: ${err instanceof Error ? err.message : 'Failed to fetch logs'}`);
+    }
+
+    newLogs.push(`[${timestamp}] Log fetch complete`);
+    setLogs(newLogs);
+    setLoadingLogs(false);
   }
 
   useEffect(() => {
@@ -618,15 +726,15 @@ function ServiceHealthCheck() {
   }, []);
 
   const services = [
-    { name: "Render Worker", key: "worker" as const },
-    { name: "Modal Inpaint", key: "modal" as const },
-    { name: "Web App", key: "web" as const },
+    { name: "Render Worker", key: "worker" as const, url: "https://blanklogo-worker.onrender.com" },
+    { name: "Modal Inpaint", key: "modal" as const, url: "https://modal.com" },
+    { name: "Web App", key: "web" as const, url: "https://www.blanklogo.app" },
   ];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <span className="text-gray-400">Real-time service status</span>
+        <span className="text-gray-400">Real-time service status (click for logs)</span>
         <button
           onClick={checkHealth}
           disabled={checking}
@@ -636,13 +744,22 @@ function ServiceHealthCheck() {
           Check Now
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         {services.map(({ name, key }) => {
           const service = health[key];
           const isHealthy = service?.status === "ok" || service?.status === "healthy";
+          const isSelected = selectedService === key;
           
           return (
-            <div key={key} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <button
+              key={key}
+              onClick={() => fetchLogs(key)}
+              className={`flex items-center justify-between p-3 rounded-lg transition cursor-pointer ${
+                isSelected 
+                  ? 'bg-blue-500/20 border border-blue-500' 
+                  : 'bg-white/5 hover:bg-white/10 border border-transparent'
+              }`}
+            >
               <span className="font-medium">{name}</span>
               <div className="flex items-center gap-2">
                 {service ? (
@@ -656,10 +773,79 @@ function ServiceHealthCheck() {
                   <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                 )}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {/* Logs Panel */}
+      {selectedService && (
+        <div className="mt-4 bg-gray-900 rounded-lg border border-white/10 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/10">
+            <span className="text-sm font-medium">
+              {services.find(s => s.key === selectedService)?.name} Logs
+            </span>
+            <button
+              onClick={() => setSelectedService(null)}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Close
+            </button>
+          </div>
+          <div className="p-4 font-mono text-xs max-h-64 overflow-y-auto">
+            {loadingLogs ? (
+              <div className="flex items-center gap-2 text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Fetching logs...
+              </div>
+            ) : logs.length > 0 ? (
+              logs.map((log, i) => (
+                <div 
+                  key={i} 
+                  className={`py-1 ${
+                    log.includes('ERROR') 
+                      ? 'text-red-400' 
+                      : log.includes('OK') || log.includes('healthy')
+                        ? 'text-green-400'
+                        : 'text-gray-300'
+                  }`}
+                >
+                  {log}
+                </div>
+              ))
+            ) : (
+              <span className="text-gray-500">No logs available</span>
+            )}
+          </div>
+          
+          {/* Service Details */}
+          {health[selectedService] && (
+            <div className="px-4 py-3 bg-white/5 border-t border-white/10">
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-gray-500">Status:</span>
+                  <span className={`ml-2 ${
+                    health[selectedService]?.status === 'ok' || health[selectedService]?.status === 'healthy'
+                      ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {health[selectedService]?.status}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Latency:</span>
+                  <span className="ml-2 text-gray-300">{health[selectedService]?.latency}ms</span>
+                </div>
+                {health[selectedService]?.error && (
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Error:</span>
+                    <span className="ml-2 text-red-400">{health[selectedService]?.error}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
