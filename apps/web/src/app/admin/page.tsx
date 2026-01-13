@@ -19,6 +19,25 @@ import {
 // Admin emails allowed to access this page
 const ADMIN_EMAILS = ["isaiahdupree33@gmail.com"];
 
+// Test user emails/patterns to exclude from stats
+const TEST_USER_PATTERNS = [
+  "isaiahdupree33@gmail.com",
+  "isaiahdupree",
+  "test@",
+  "e2e+",
+  "e2e@",
+  "test+",
+  "@test.com",
+  "@example.com",
+];
+
+// Helper to check if email is a test user
+function isTestUser(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const lowerEmail = email.toLowerCase();
+  return TEST_USER_PATTERNS.some(pattern => lowerEmail.includes(pattern.toLowerCase()));
+}
+
 interface AdminStats {
   users: {
     total: number;
@@ -140,27 +159,34 @@ export default function AdminPage() {
   async function fetchStats() {
     setRefreshing(true);
     try {
-      // Fetch user stats
-      const { data: users, count: totalUsers } = await supabase
+      // Fetch user stats (with email to filter test users)
+      const { data: allUsers } = await supabase
         .from("bl_users")
-        .select("created_at", { count: "exact" });
+        .select("id, email, created_at");
+
+      // Filter out test users
+      const users = allUsers?.filter(u => !isTestUser(u.email)) || [];
+      const testUserIds = new Set(allUsers?.filter(u => isTestUser(u.email)).map(u => u.id) || []);
 
       const now = new Date();
       const day = 24 * 60 * 60 * 1000;
-      const usersLast24h = users?.filter(u => 
+      const usersLast24h = users.filter(u => 
         new Date(u.created_at) > new Date(now.getTime() - day)
-      ).length || 0;
-      const usersLast7d = users?.filter(u => 
+      ).length;
+      const usersLast7d = users.filter(u => 
         new Date(u.created_at) > new Date(now.getTime() - 7 * day)
-      ).length || 0;
-      const usersLast30d = users?.filter(u => 
+      ).length;
+      const usersLast30d = users.filter(u => 
         new Date(u.created_at) > new Date(now.getTime() - 30 * day)
-      ).length || 0;
+      ).length;
 
-      // Fetch job stats
-      const { data: jobs, count: totalJobs } = await supabase
+      // Fetch job stats (filter out jobs from test users)
+      const { data: allJobs } = await supabase
         .from("bl_jobs")
-        .select("status, created_at", { count: "exact" });
+        .select("user_id, status, created_at");
+      
+      // Filter out jobs from test users
+      const jobs = allJobs?.filter(j => !testUserIds.has(j.user_id)) || [];
 
       const completedJobs = jobs?.filter(j => j.status === "completed").length || 0;
       const failedJobs = jobs?.filter(j => j.status === "failed" || j.status === "failed_terminal").length || 0;
@@ -174,22 +200,26 @@ export default function AdminPage() {
         new Date(j.created_at) > new Date(now.getTime() - 7 * day)
       ).length || 0;
 
-      // Fetch credit stats
-      const { data: credits } = await supabase
+      // Fetch credit stats (filter out test users)
+      const { data: allCredits } = await supabase
         .from("bl_credit_ledger")
-        .select("amount, type");
+        .select("user_id, amount, type");
+      
+      const credits = allCredits?.filter(c => !testUserIds.has(c.user_id)) || [];
 
-      const totalGranted = credits?.filter(c => c.amount > 0 && c.type === "grant")
-        .reduce((sum, c) => sum + c.amount, 0) || 0;
-      const totalUsed = credits?.filter(c => c.amount < 0)
-        .reduce((sum, c) => sum + Math.abs(c.amount), 0) || 0;
-      const totalPurchased = credits?.filter(c => c.amount > 0 && c.type === "purchase")
-        .reduce((sum, c) => sum + c.amount, 0) || 0;
+      const totalGranted = credits.filter(c => c.amount > 0 && c.type === "grant")
+        .reduce((sum, c) => sum + c.amount, 0);
+      const totalUsed = credits.filter(c => c.amount < 0)
+        .reduce((sum, c) => sum + Math.abs(c.amount), 0);
+      const totalPurchased = credits.filter(c => c.amount > 0 && c.type === "purchase")
+        .reduce((sum, c) => sum + c.amount, 0);
 
-      // Fetch revenue (from Stripe transactions or credit purchases)
-      const { data: transactions } = await supabase
+      // Fetch revenue (filter out test users)
+      const { data: allTransactions } = await supabase
         .from("bl_transactions")
-        .select("amount, type, created_at");
+        .select("user_id, amount, type, created_at");
+      
+      const transactions = allTransactions?.filter(t => !testUserIds.has(t.user_id)) || [];
 
       const totalRevenue = transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
       const revenueLast30d = transactions?.filter(t => 
@@ -236,14 +266,16 @@ export default function AdminPage() {
           }, {} as Record<string, number>)
         ).filter(count => count > 1).length : 0;
 
-      // Session duration estimates (from job processing times)
-      const { data: jobsWithDuration } = await supabase
+      // Session duration estimates (from job processing times, excluding test users)
+      const { data: allJobsWithDuration } = await supabase
         .from("bl_jobs")
         .select("user_id, created_at, completed_at, status")
         .eq("status", "completed");
+      
+      const jobsWithDuration = allJobsWithDuration?.filter(j => !testUserIds.has(j.user_id)) || [];
 
       const userSessions: Record<string, number> = {};
-      jobsWithDuration?.forEach(j => {
+      jobsWithDuration.forEach(j => {
         if (j.user_id) {
           userSessions[j.user_id] = (userSessions[j.user_id] || 0) + 1;
         }
@@ -262,19 +294,19 @@ export default function AdminPage() {
 
       setStats({
         users: {
-          total: totalUsers || 0,
+          total: users.length,
           last24h: usersLast24h,
           last7d: usersLast7d,
           last30d: usersLast30d,
         },
         jobs: {
-          total: totalJobs || 0,
+          total: jobs.length,
           completed: completedJobs,
           failed: failedJobs,
           pending: pendingJobs,
           last24h: jobsLast24h,
           last7d: jobsLast7d,
-          successRate: totalJobs ? Math.round((completedJobs / (completedJobs + failedJobs)) * 100) : 0,
+          successRate: jobs.length ? Math.round((completedJobs / (completedJobs + failedJobs)) * 100) : 0,
         },
         credits: {
           totalGranted,
