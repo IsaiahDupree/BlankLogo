@@ -12,6 +12,7 @@ import {
   Zap,
   Activity
 } from "lucide-react";
+import { retention } from "@/lib/posthog-events";
 
 // Simple Card components
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -168,6 +169,26 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Track return session (check last visit timestamp)
+    const lastVisit = localStorage.getItem('bl_last_dashboard_visit');
+    if (lastVisit) {
+      const lastVisitDate = new Date(lastVisit);
+      const now = new Date();
+      const hoursSince = (now.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60);
+      const daysSince = hoursSince / 24;
+      
+      // Only track if they've been away for at least 1 hour
+      if (hoursSince >= 1) {
+        retention.returnSession({
+          days_since_last_visit: Math.floor(daysSince),
+          hours_since_last_visit: Math.floor(hoursSince),
+          is_first_return: daysSince >= 1,
+        });
+      }
+    }
+    // Update last visit timestamp
+    localStorage.setItem('bl_last_dashboard_visit', new Date().toISOString());
+
     async function fetchAnalytics() {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -190,6 +211,16 @@ export default function DashboardPage() {
 
         const result = await response.json();
         setData(result);
+        
+        // Track low credits warning if balance is low
+        const LOW_CREDITS_THRESHOLD = 3;
+        if (result.credits?.balance <= LOW_CREDITS_THRESHOLD && result.credits?.balance > 0) {
+          retention.lowCreditsWarningShown({
+            credits_balance: result.credits.balance,
+            threshold: LOW_CREDITS_THRESHOLD,
+            location: 'dashboard',
+          });
+        }
       } catch (err) {
         console.error('[Dashboard] Analytics fetch error:', err);
         setError(err instanceof Error ? err.message : 'Failed to load analytics');

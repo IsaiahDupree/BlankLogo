@@ -23,6 +23,12 @@ export default function SignupPage() {
     console.log("[SIGNUP PAGE] Supabase client initialized");
     // Track signup page view for Meta Pixel
     trackViewContent({ contentName: 'Signup Page', contentCategory: 'auth' });
+    // Track signup_start for PostHog (user landed on signup page)
+    auth.signupStart({ source: 'signup_page' });
+    // Track Lead for Meta Pixel
+    trackLead({ contentName: 'Signup Started' });
+    // Store signup start time for activation tracking
+    localStorage.setItem('bl_signup_start_time', Date.now().toString());
     return () => console.log("[SIGNUP PAGE] 📝 Page unmounted");
   }, []);
 
@@ -31,6 +37,10 @@ export default function SignupPage() {
     console.log("[SIGNUP] 🚀 Signup form submitted");
     console.log("[SIGNUP] Email:", email);
     console.log("[SIGNUP] Password length:", password.length);
+    
+    // Track signup_submit for PostHog
+    const emailDomain = email.split('@')[1] || 'unknown';
+    auth.signupSubmit({ email_domain: emailDomain });
     
     setLoading(true);
     setError(null);
@@ -63,7 +73,10 @@ export default function SignupPage() {
     console.log("[SIGNUP] User email:", data.user?.email);
     console.log("[SIGNUP] 📧 Confirmation email sent");
     
-    // Track signup for PostHog
+    // Track auth_email_sent for PostHog
+    auth.authEmailSent({ email_domain: emailDomain });
+    
+    // Track signup for PostHog (note: user isn't fully signed in until they confirm email)
     if (data.user?.id) {
       auth.signedIn({ user_id: data.user.id, method: 'email', is_new_user: true, email: data.user.email });
     }

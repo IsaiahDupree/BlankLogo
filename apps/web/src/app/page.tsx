@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { ArrowRight, Zap, Shield, Clock, Upload, Download, Video } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { trackViewLanding } from "@/lib/meta-pixel";
+import { acquisition, getAttributionFromUrl, persistAttribution } from "@/lib/posthog-events";
 
 const PLATFORMS = [
   { id: "sora", name: "Sora", color: "from-purple-500 to-pink-500" },
@@ -19,17 +20,46 @@ export default function Home() {
     console.log("[PAGE: HOME] 🏠 Homepage loaded");
     console.log("[PAGE: HOME] Available platforms:", PLATFORMS.map(p => p.name).join(", "));
     console.log("[PAGE: HOME] Timestamp:", new Date().toISOString());
+    
+    // Capture and persist UTM attribution from URL
+    const attribution = getAttributionFromUrl();
+    persistAttribution(attribution);
+    
     // Track landing page view for Meta Pixel
     trackViewLanding();
+    
+    // Track landing page view for PostHog with attribution
+    acquisition.landingView({
+      page_path: window.location.pathname,
+      ...attribution,
+    });
+
+    // Track scroll depth milestones
+    let scrollMilestones = new Set<number>();
+    const handleScroll = () => {
+      const scrollPercent = Math.round(
+        (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100
+      );
+      const milestones = [25, 50, 75, 100] as const;
+      for (const milestone of milestones) {
+        if (scrollPercent >= milestone && !scrollMilestones.has(milestone)) {
+          scrollMilestones.add(milestone);
+          acquisition.scrollDepth({ depth: milestone, page_path: window.location.pathname });
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handlePlatformClick = (platformId: string) => {
-    console.log("[PAGE: HOME] 🎯 Platform clicked:", platformId);
-  };
-
-  const handleCTAClick = (action: string) => {
-    console.log("[PAGE: HOME] 🚀 CTA clicked:", action);
-  };
+  const handleCTAClick = useCallback((ctaText: string, location: string) => {
+    console.log("[PAGE: HOME] 🚀 CTA clicked:", ctaText);
+    acquisition.ctaClick({
+      cta_text: ctaText,
+      cta_location: location,
+      page_path: window.location.pathname,
+    });
+  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white">
@@ -51,6 +81,7 @@ export default function Home() {
           <Link
             href="/signup"
             className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+            onClick={() => handleCTAClick('Get Started', 'header')}
           >
             Get Started
           </Link>
@@ -82,12 +113,14 @@ export default function Home() {
           <Link
             href="/app"
             className="px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-semibold text-lg flex items-center gap-2"
+            onClick={() => handleCTAClick('Remove Watermark', 'hero')}
           >
             Remove Watermark <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
             href="#how-it-works"
             className="px-8 py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition font-semibold text-lg"
+            onClick={() => handleCTAClick('See How It Works', 'hero')}
           >
             See How It Works
           </Link>
@@ -233,6 +266,7 @@ export default function Home() {
           <Link
             href="/app"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-indigo-600 font-semibold text-lg hover:bg-gray-100 transition"
+            onClick={() => handleCTAClick('Remove Watermark Free', 'footer_cta')}
           >
             Remove Watermark Free <ArrowRight className="w-5 h-5" />
           </Link>

@@ -1,0 +1,392 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BlankLogo Event Dictionary",
+  "description": "Canonical event definitions with PostHog and Meta Pixel/CAPI mappings",
+  "version": "1.0.0",
+  "updated": "2026-01-12",
+  
+  "events": {
+    "acquisition": {
+      "landing_view": {
+        "description": "First page view from ad or organic",
+        "posthog": "landing_view",
+        "meta_pixel": "ViewContent",
+        "meta_capi": null,
+        "funnel_stage": "acquisition",
+        "required_properties": ["page_path"],
+        "optional_properties": ["utm_source", "utm_campaign", "utm_content", "utm_medium", "utm_term", "fbclid", "gclid", "referrer", "device", "geo", "landing_variant"]
+      },
+      "cta_click": {
+        "description": "CTA button clicked (Get Free Credits, Get Started)",
+        "posthog": "cta_click",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "acquisition",
+        "required_properties": ["cta_text", "cta_location", "page_path"],
+        "optional_properties": []
+      },
+      "pricing_view": {
+        "description": "Pricing page viewed",
+        "posthog": "pricing_view",
+        "meta_pixel": "ViewContent",
+        "meta_capi": null,
+        "funnel_stage": "acquisition",
+        "required_properties": [],
+        "optional_properties": ["plan_viewed"]
+      },
+      "faq_expand": {
+        "description": "FAQ section expanded",
+        "posthog": "faq_expand",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "acquisition",
+        "required_properties": ["question"],
+        "optional_properties": ["category"]
+      }
+    },
+
+    "activation": {
+      "signup_start": {
+        "description": "Signup flow started (form opened)",
+        "posthog": "signup_start",
+        "meta_pixel": "Lead",
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "required_properties": [],
+        "optional_properties": ["source"]
+      },
+      "signup_submit": {
+        "description": "Signup form submitted",
+        "posthog": "signup_submit",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "required_properties": ["email_domain"],
+        "optional_properties": []
+      },
+      "auth_email_sent": {
+        "description": "Magic link email sent",
+        "posthog": "auth_email_sent",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "required_properties": ["email_domain"],
+        "optional_properties": []
+      },
+      "auth_email_link_clicked": {
+        "description": "User clicked magic link in email",
+        "posthog": "auth_email_link_clicked",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "required_properties": [],
+        "optional_properties": []
+      },
+      "login_success": {
+        "description": "User successfully authenticated",
+        "posthog": "auth_signed_in",
+        "meta_pixel": "CompleteRegistration",
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "required_properties": ["user_id", "method", "is_new_user"],
+        "optional_properties": ["email"]
+      },
+      "credits_granted": {
+        "description": "Free credits applied to account",
+        "posthog": "credits_awarded",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "required_properties": ["credits_delta", "reason", "new_balance"],
+        "optional_properties": ["rule_id", "event_id"]
+      },
+      "activation_complete": {
+        "description": "User is ready to use the product (logged in + credits + reached upload)",
+        "posthog": "activation_complete",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "activation",
+        "milestone": true,
+        "required_properties": ["user_id", "credits_balance"],
+        "optional_properties": ["time_to_activate_ms"]
+      }
+    },
+
+    "core_value": {
+      "upload_view": {
+        "description": "Upload screen viewed",
+        "posthog": "upload_view",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "required_properties": [],
+        "optional_properties": ["credits_balance"]
+      },
+      "upload_started": {
+        "description": "File upload began",
+        "posthog": "upload_started",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "required_properties": ["file_ext", "file_mb"],
+        "optional_properties": ["codec", "job_id", "video_id"]
+      },
+      "upload_completed": {
+        "description": "File upload finished",
+        "posthog": "upload_completed",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "required_properties": ["upload_ms", "file_mb"],
+        "optional_properties": ["storage_provider", "job_id"]
+      },
+      "job_created": {
+        "description": "Job submitted to queue",
+        "posthog": "job_created",
+        "meta_pixel": "GenerateRequested",
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "required_properties": ["job_id", "platform", "input_type"],
+        "optional_properties": ["job_type", "input_mb", "mode"]
+      },
+      "processing_started": {
+        "description": "Worker picked up job",
+        "posthog": "job_started",
+        "meta_pixel": "JobStarted",
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "required_properties": ["job_id"],
+        "optional_properties": ["cold_start_ms", "gpu_type"]
+      },
+      "processing_completed": {
+        "description": "Job finished successfully",
+        "posthog": "job_completed",
+        "meta_pixel": "MediaReady",
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "milestone": true,
+        "required_properties": ["job_id", "total_duration_ms", "platform"],
+        "optional_properties": ["output_mb", "watermarks_detected", "mode", "detected_platform", "watermark_confidence", "video_duration_bucket", "resolution_bucket"]
+      },
+      "processing_failed": {
+        "description": "Job failed",
+        "posthog": "job_failed",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "risk",
+        "required_properties": ["job_id", "failure_stage", "error_code", "platform"],
+        "optional_properties": ["http_status", "attempt", "failure_reason"]
+      },
+      "download_clicked": {
+        "description": "User clicked download button",
+        "posthog": "job_download_clicked",
+        "meta_pixel": "Download",
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "milestone": true,
+        "required_properties": ["job_id"],
+        "optional_properties": ["platform"]
+      },
+      "download_completed": {
+        "description": "Download finished",
+        "posthog": "job_download_completed",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "value",
+        "required_properties": ["job_id"],
+        "optional_properties": ["file_mb"]
+      }
+    },
+
+    "monetization": {
+      "paywall_view": {
+        "description": "Paywall/upgrade prompt shown",
+        "posthog": "billing_paywall_viewed",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "revenue",
+        "required_properties": ["placement"],
+        "optional_properties": ["user_id", "credits_balance"]
+      },
+      "checkout_started": {
+        "description": "User started checkout flow",
+        "posthog": "billing_checkout_started",
+        "meta_pixel": "InitiateCheckout",
+        "meta_capi": null,
+        "funnel_stage": "revenue",
+        "required_properties": ["plan", "price_id", "credits", "amount_cents"],
+        "optional_properties": ["user_id"]
+      },
+      "purchase_completed": {
+        "description": "Payment successful",
+        "posthog": "billing_checkout_completed",
+        "meta_pixel": "Purchase",
+        "meta_capi": "Purchase",
+        "funnel_stage": "revenue",
+        "milestone": true,
+        "required_properties": ["plan", "price_id", "credits", "amount_cents"],
+        "optional_properties": ["order_id", "user_id", "event_id"]
+      },
+      "subscription_started": {
+        "description": "New subscription activated",
+        "posthog": "billing_checkout_completed",
+        "meta_pixel": "Subscribe",
+        "meta_capi": "Subscribe",
+        "funnel_stage": "revenue",
+        "required_properties": ["plan", "price_id", "amount_cents"],
+        "optional_properties": ["event_id", "predicted_ltv"]
+      },
+      "subscription_canceled": {
+        "description": "Subscription canceled",
+        "posthog": "subscription_canceled",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "risk",
+        "required_properties": ["user_id", "plan"],
+        "optional_properties": ["reason", "cancel_at_period_end"]
+      }
+    },
+
+    "retention": {
+      "return_session": {
+        "description": "User returned after absence",
+        "posthog": "return_session",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "retention",
+        "required_properties": ["days_since_last_visit", "hours_since_last_visit"],
+        "optional_properties": ["is_first_return"]
+      },
+      "upload_returning_user": {
+        "description": "First upload in a returning session",
+        "posthog": "upload_returning_user",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "retention",
+        "required_properties": [],
+        "optional_properties": ["days_since_last_job", "job_id"]
+      },
+      "job_completed_returning_user": {
+        "description": "Job completed by returning user",
+        "posthog": "job_completed_returning_user",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "retention",
+        "required_properties": ["days_since_last_job", "total_jobs_completed"],
+        "optional_properties": ["job_id"]
+      },
+      "low_credits_warning_shown": {
+        "description": "Low credits warning displayed",
+        "posthog": "low_credits_warning_shown",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "retention",
+        "required_properties": ["credits_balance", "threshold", "location"],
+        "optional_properties": []
+      },
+      "low_credits_topup_clicked": {
+        "description": "User clicked topup from low credits warning",
+        "posthog": "low_credits_topup_clicked",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "retention",
+        "required_properties": ["credits_balance", "location"],
+        "optional_properties": []
+      }
+    },
+
+    "reliability": {
+      "error_shown": {
+        "description": "Error message displayed to user",
+        "posthog": "error_ui",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "risk",
+        "required_properties": ["error_code", "route"],
+        "optional_properties": ["component", "message"]
+      },
+      "api_error": {
+        "description": "Backend API error",
+        "posthog": "error_api",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "risk",
+        "required_properties": ["route", "http_status", "error_code"],
+        "optional_properties": ["message", "job_id"]
+      },
+      "job_timeout": {
+        "description": "Job processing timed out",
+        "posthog": "job_failed",
+        "meta_pixel": null,
+        "meta_capi": null,
+        "funnel_stage": "risk",
+        "required_properties": ["job_id"],
+        "optional_properties": ["timeout_ms", "stage"]
+      }
+    }
+  },
+
+  "milestones": {
+    "activated": {
+      "event": "activation_complete",
+      "description": "User is ready to use product"
+    },
+    "first_value": {
+      "event": "processing_completed",
+      "description": "First successful job",
+      "condition": "first occurrence per user"
+    },
+    "aha_moment": {
+      "event": "download_clicked",
+      "description": "First download (key activation signal)",
+      "condition": "first occurrence per user"
+    },
+    "monetized": {
+      "event": "purchase_completed",
+      "description": "First purchase",
+      "condition": "first occurrence per user"
+    }
+  },
+
+  "common_properties": {
+    "always_include": [
+      "distinct_id",
+      "user_id",
+      "session_id",
+      "timestamp",
+      "source",
+      "environment"
+    ],
+    "attribution": [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_content",
+      "utm_term",
+      "fbclid",
+      "gclid",
+      "campaign_id",
+      "adset_id",
+      "ad_id",
+      "creative_id",
+      "ad_angle",
+      "landing_variant",
+      "referrer"
+    ],
+    "job_context": [
+      "job_id",
+      "mode",
+      "detected_platform",
+      "watermark_confidence",
+      "video_duration_bucket",
+      "resolution_bucket",
+      "file_size_bucket",
+      "processing_time_ms",
+      "queue_wait_ms",
+      "success",
+      "failure_reason_code",
+      "credits_before",
+      "credits_after"
+    ]
+  }
+}

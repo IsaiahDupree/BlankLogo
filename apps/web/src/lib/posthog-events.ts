@@ -167,6 +167,107 @@ export function getSessionId(): string | undefined {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// ATTRIBUTION HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+export interface AttributionParams {
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+  utm_term?: string;
+  fbclid?: string;
+  gclid?: string;
+  ad_platform?: string;
+  campaign_id?: string;
+  adset_id?: string;
+  ad_id?: string;
+  creative_id?: string;
+  ad_angle?: string;
+  landing_variant?: string;
+  referrer?: string;
+}
+
+// Get attribution from URL params (call on landing)
+export function getAttributionFromUrl(): AttributionParams {
+  if (typeof window === 'undefined') return {};
+  const params = new URLSearchParams(window.location.search);
+  return {
+    utm_source: params.get('utm_source') || undefined,
+    utm_medium: params.get('utm_medium') || undefined,
+    utm_campaign: params.get('utm_campaign') || undefined,
+    utm_content: params.get('utm_content') || undefined,
+    utm_term: params.get('utm_term') || undefined,
+    fbclid: params.get('fbclid') || undefined,
+    gclid: params.get('gclid') || undefined,
+    campaign_id: params.get('campaign_id') || undefined,
+    adset_id: params.get('adset_id') || undefined,
+    ad_id: params.get('ad_id') || undefined,
+    referrer: document.referrer || undefined,
+  };
+}
+
+// Store attribution in sessionStorage for later events
+export function persistAttribution(attrs: AttributionParams): void {
+  if (typeof window === 'undefined') return;
+  const existing = getPersistedAttribution();
+  const merged = { ...existing, ...attrs };
+  sessionStorage.setItem('bl_attribution', JSON.stringify(merged));
+}
+
+// Get persisted attribution
+export function getPersistedAttribution(): AttributionParams {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = sessionStorage.getItem('bl_attribution');
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ACQUISITION EVENTS (ad → site)
+// ═══════════════════════════════════════════════════════════════════
+
+export const acquisition = {
+  /** Landing page viewed (from ad or organic) */
+  landingView: (props: AttributionParams & { 
+    page_path: string; 
+    device?: string; 
+    geo?: string;
+  }) => {
+    // Auto-persist attribution on landing
+    persistAttribution(props);
+    track('landing_view', { ...getPersistedAttribution(), ...props });
+  },
+
+  /** CTA clicked (Get Free Credits, Get Started, etc.) */
+  ctaClick: (props: { 
+    cta_text: string; 
+    cta_location: 'hero' | 'pricing' | 'sticky' | 'footer' | string;
+    page_path: string;
+  }) => {
+    track('cta_click', { ...getPersistedAttribution(), ...props });
+  },
+
+  /** Pricing page viewed */
+  pricingView: (props?: { plan_viewed?: string }) => {
+    track('pricing_view', { ...getPersistedAttribution(), ...props });
+  },
+
+  /** FAQ section expanded */
+  faqExpand: (props: { question: string; category?: string }) => {
+    track('faq_expand', props);
+  },
+
+  /** Scroll depth milestone reached */
+  scrollDepth: (props: { depth: 25 | 50 | 75 | 100; page_path: string }) => {
+    track('scroll_depth', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
 // A) AUTH EVENTS
 // ═══════════════════════════════════════════════════════════════════
 
@@ -176,9 +277,29 @@ export const auth = {
     track('auth_login_viewed', props);
   },
 
+  /** Signup flow started (form opened) */
+  signupStart: (props?: { source?: string }) => {
+    track('signup_start', { ...getPersistedAttribution(), ...props });
+  },
+
+  /** Signup form submitted */
+  signupSubmit: (props: { email_domain: string }) => {
+    track('signup_submit', { ...getPersistedAttribution(), ...props });
+  },
+
   /** Magic link requested */
   magicLinkRequested: (props: { email_domain: string; is_existing_user?: boolean }) => {
     track('auth_magic_link_requested', props);
+  },
+
+  /** Auth email sent (server-side, mirrored here) */
+  authEmailSent: (props: { email_domain: string }) => {
+    track('auth_email_sent', props);
+  },
+
+  /** Auth email link clicked (callback loaded) */
+  authEmailLinkClicked: () => {
+    track('auth_email_link_clicked', {});
   },
 
   /** Magic link request failed */
@@ -221,6 +342,69 @@ export const auth = {
   /** User provisioning failed */
   provisioningFailed: (props: { user_id: string; error_code: ErrorCode }) => {
     track('auth_provisioning_failed', props);
+  },
+
+  /** Activation complete - user is ready to use the product */
+  activationComplete: (props: { user_id: string; credits_balance: number; time_to_activate_ms?: number }) => {
+    track('activation_complete', { ...getPersistedAttribution(), ...props });
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// RETENTION EVENTS
+// ═══════════════════════════════════════════════════════════════════
+
+export const retention = {
+  /** Return session - user came back after X hours/days */
+  returnSession: (props: { 
+    days_since_last_visit: number; 
+    hours_since_last_visit: number;
+    is_first_return?: boolean;
+  }) => {
+    track('return_session', props);
+  },
+
+  /** First upload in a returning session */
+  uploadReturningUser: (props: CorrelationIds & { days_since_last_job?: number }) => {
+    track('upload_returning_user', props);
+  },
+
+  /** Job completed by returning user */
+  jobCompletedReturningUser: (props: CorrelationIds & { 
+    days_since_last_job: number;
+    total_jobs_completed: number;
+  }) => {
+    track('job_completed_returning_user', props);
+  },
+
+  /** Low credits warning shown */
+  lowCreditsWarningShown: (props: { 
+    credits_balance: number; 
+    threshold: number;
+    location: 'upload' | 'dashboard' | 'post_job';
+  }) => {
+    track('low_credits_warning_shown', props);
+  },
+
+  /** Low credits topup clicked */
+  lowCreditsTopupClicked: (props: { credits_balance: number; location: string }) => {
+    track('low_credits_topup_clicked', props);
+  },
+
+  /** Notification sent (job complete email/webhook) */
+  notificationSent: (props: CorrelationIds & { 
+    type: 'job_complete' | 'job_failed' | 'credits_low' | 'weekly_summary';
+    channel: 'email' | 'webhook';
+  }) => {
+    track('notification_sent', props);
+  },
+
+  /** Notification clicked (user clicked link in email) */
+  notificationClicked: (props: CorrelationIds & { 
+    type: string;
+    channel: 'email' | 'webhook';
+  }) => {
+    track('notification_clicked', props);
   },
 };
 
@@ -568,6 +752,10 @@ export default {
   reset,
   getSessionId,
   generateRequestId,
+  getAttributionFromUrl,
+  persistAttribution,
+  getPersistedAttribution,
+  acquisition,
   auth,
   onboarding,
   billing,
@@ -577,4 +765,5 @@ export default {
   system,
   promo,
   credits,
+  retention,
 };

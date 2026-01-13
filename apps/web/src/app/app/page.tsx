@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Clock, CheckCircle, XCircle, Loader2, Video, RefreshCw, AlertCircle, Film } from "lucide-react";
 import { VideoThumbnail } from "@/components/video-thumbnail";
 import { createBrowserClient } from "@supabase/ssr";
+import { auth } from "@/lib/posthog-events";
 
 interface BlJob {
   id: string;
@@ -125,10 +126,42 @@ export default function DashboardPage() {
     setLoading(false);
   }, [supabase]);
 
-  // Initial fetch
+  // Initial fetch + activation tracking
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+    
+    // Check for activation_complete (first time user reaches app with credits)
+    const checkActivation = async () => {
+      const activationKey = 'bl_activation_tracked';
+      if (localStorage.getItem(activationKey)) return; // Already tracked
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Get credits balance
+      const { data: credits } = await supabase
+        .from('bl_credit_ledger')
+        .select('amount')
+        .eq('user_id', user.id);
+      
+      const balance = credits?.reduce((sum, c) => sum + c.amount, 0) || 0;
+      
+      if (balance > 0) {
+        // User has credits - they're activated!
+        const signupTime = localStorage.getItem('bl_signup_start_time');
+        const timeToActivate = signupTime ? Date.now() - parseInt(signupTime) : undefined;
+        
+        auth.activationComplete({
+          user_id: user.id,
+          credits_balance: balance,
+          time_to_activate_ms: timeToActivate,
+        });
+        localStorage.setItem(activationKey, 'true');
+      }
+    };
+    
+    checkActivation();
+  }, [fetchJobs, supabase]);
 
   // Poll for updates on active jobs
   useEffect(() => {

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Check, Zap, Crown, Rocket, CreditCard, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { trackViewPricing, trackStartCheckout } from "@/lib/meta-pixel";
+import { acquisition, billing } from "@/lib/posthog-events";
 
 // Stripe Price IDs (must match apps/web/src/lib/stripe.ts)
 const PRICE_IDS = {
@@ -96,6 +97,8 @@ export default function PricingPage() {
     console.log("[PRICING PAGE] 💰 Page mounted");
     // Track pricing page view for Meta Pixel
     trackViewPricing();
+    // Track pricing page view for PostHog
+    acquisition.pricingView();
     // Check if user is logged in
     supabase.auth.getUser().then(({ data: { user } }) => {
       setIsLoggedIn(!!user);
@@ -128,11 +131,23 @@ export default function PricingPage() {
       // Track InitiateCheckout and get event_id for CAPI deduplication
       const monthlyPlan = MONTHLY_PLANS.find(p => p.id === planId);
       const creditPack = CREDIT_PACKS.find(p => p.id === planId);
+      const price = monthlyPlan?.price || creditPack?.price || 0;
+      const credits = monthlyPlan?.credits || creditPack?.credits || 0;
+      
+      // Track for PostHog
+      billing.checkoutStarted({
+        plan: planId,
+        price_id: priceId,
+        credits,
+        amount_cents: price * 100,
+      });
+      
+      // Track for Meta Pixel
       const eventId = trackStartCheckout({
         packId: planId,
-        packName: monthlyPlan?.name || `${creditPack?.credits} Credits`,
-        price: monthlyPlan?.price || creditPack?.price || 0,
-        credits: monthlyPlan?.credits || creditPack?.credits || 0,
+        packName: monthlyPlan?.name || `${credits} Credits`,
+        price,
+        credits,
       });
 
       const res = await fetch("/api/stripe/checkout", {
@@ -370,10 +385,22 @@ export default function PricingPage() {
 }
 
 function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  const handleExpand = () => {
+    if (!expanded) {
+      acquisition.faqExpand({ question, category: 'pricing' });
+    }
+    setExpanded(!expanded);
+  };
+  
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+    <div 
+      className="bg-white/5 border border-white/10 rounded-xl p-6 cursor-pointer hover:bg-white/10 transition"
+      onClick={handleExpand}
+    >
       <h3 className="font-semibold mb-2">{question}</h3>
-      <p className="text-gray-400">{answer}</p>
+      <p className={`text-gray-400 ${expanded ? '' : 'line-clamp-2'}`}>{answer}</p>
     </div>
   );
 }

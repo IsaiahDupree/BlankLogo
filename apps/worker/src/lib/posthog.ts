@@ -183,8 +183,49 @@ export const job = {
     output_mb?: number;
     watermarks_detected?: number;
     platform: string;
+    // ML-ready content complexity signals
+    mode?: 'crop' | 'inpaint';
+    detected_platform?: string;
+    watermark_position?: 'corner' | 'edge' | 'center' | 'unknown';
+    watermark_confidence?: number;
+    video_duration_sec?: number;
+    resolution?: string;
+    input_mb?: number;
+    credits_before?: number;
+    credits_after?: number;
   }) => {
-    capture(props.user_id || 'system', 'job_completed', { ...props, status: 'completed' });
+    // Add derived ML features
+    const enriched = {
+      ...props,
+      status: 'completed',
+      // Duration bucket for ML
+      video_duration_bucket: props.video_duration_sec 
+        ? props.video_duration_sec <= 10 ? '0-10s'
+          : props.video_duration_sec <= 30 ? '10-30s'
+          : props.video_duration_sec <= 60 ? '30-60s'
+          : '60s+'
+        : undefined,
+      // Resolution bucket
+      resolution_bucket: props.resolution
+        ? props.resolution.includes('720') ? '720p'
+          : props.resolution.includes('1080') ? '1080p'
+          : props.resolution.includes('4k') || props.resolution.includes('2160') ? '4k'
+          : 'other'
+        : undefined,
+      // Latency bucket (processing time)
+      latency_bucket: props.total_duration_ms
+        ? props.total_duration_ms < 30000 ? '<30s'
+          : props.total_duration_ms < 120000 ? '30-120s'
+          : '>120s'
+        : undefined,
+      // File size bucket
+      file_size_bucket: props.input_mb
+        ? props.input_mb < 50 ? '<50mb'
+          : props.input_mb < 150 ? '50-150mb'
+          : '>150mb'
+        : undefined,
+    };
+    capture(props.user_id || 'system', 'job_completed', enriched);
   },
 
   /** Job failed */
