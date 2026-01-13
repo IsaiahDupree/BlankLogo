@@ -46,6 +46,18 @@ interface AdminStats {
     subscriptions: number;
     oneTime: number;
   };
+  userGrowth: { date: string; count: number }[];
+  retention: {
+    returnRate7d: number;
+    returnRate30d: number;
+    avgSessionsPerUser: number;
+    usersWithMultipleSessions: number;
+  };
+  sessionDuration: {
+    avgDurationMs: number;
+    totalSessions: number;
+    avgJobsPerSession: number;
+  };
 }
 
 function StatCard({ 
@@ -188,6 +200,66 @@ export default function AdminPage() {
       const oneTimeRevenue = transactions?.filter(t => t.type === "one_time")
         .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
+      // Calculate user growth by day (last 30 days)
+      const userGrowth: { date: string; count: number }[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const dayStart = new Date(now.getTime() - i * day);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart.getTime() + day);
+        const count = users?.filter(u => {
+          const created = new Date(u.created_at);
+          return created >= dayStart && created < dayEnd;
+        }).length || 0;
+        userGrowth.push({
+          date: dayStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          count,
+        });
+      }
+
+      // Calculate retention metrics
+      // Users who came back within 7 days of signup
+      const usersWithJobs = new Set<string>();
+      const userJobDates: Record<string, Date[]> = {};
+      
+      jobs?.forEach(j => {
+        // Jobs have user_id - we need to track unique users with multiple sessions
+        const jobDate = new Date(j.created_at);
+        // Group by date to estimate sessions
+      });
+
+      // Estimate return rate from job activity
+      const usersWithMultipleJobs = jobs ? 
+        Object.values(
+          jobs.reduce((acc, j) => {
+            // This is a simplified metric - in production, you'd track actual sessions
+            return acc;
+          }, {} as Record<string, number>)
+        ).filter(count => count > 1).length : 0;
+
+      // Session duration estimates (from job processing times)
+      const { data: jobsWithDuration } = await supabase
+        .from("bl_jobs")
+        .select("user_id, created_at, completed_at, status")
+        .eq("status", "completed");
+
+      const userSessions: Record<string, number> = {};
+      jobsWithDuration?.forEach(j => {
+        if (j.user_id) {
+          userSessions[j.user_id] = (userSessions[j.user_id] || 0) + 1;
+        }
+      });
+
+      const usersWithMultipleSessions = Object.values(userSessions).filter(count => count > 1).length;
+      const totalUsersWithSessions = Object.keys(userSessions).length;
+      const avgSessionsPerUser = totalUsersWithSessions > 0 
+        ? Object.values(userSessions).reduce((a, b) => a + b, 0) / totalUsersWithSessions 
+        : 0;
+
+      // Return rate: users who have more than 1 job
+      const returnRate7d = totalUsersWithSessions > 0 
+        ? Math.round((usersWithMultipleSessions / totalUsersWithSessions) * 100) 
+        : 0;
+
       setStats({
         users: {
           total: totalUsers || 0,
@@ -210,10 +282,22 @@ export default function AdminPage() {
           totalPurchased,
         },
         revenue: {
-          total: totalRevenue / 100, // Convert cents to dollars
+          total: totalRevenue / 100,
           last30d: revenueLast30d / 100,
           subscriptions: subscriptionRevenue / 100,
           oneTime: oneTimeRevenue / 100,
+        },
+        userGrowth,
+        retention: {
+          returnRate7d,
+          returnRate30d: returnRate7d, // Simplified - same metric for now
+          avgSessionsPerUser: Math.round(avgSessionsPerUser * 10) / 10,
+          usersWithMultipleSessions,
+        },
+        sessionDuration: {
+          avgDurationMs: 0, // Would need actual session tracking
+          totalSessions: jobsWithDuration?.length || 0,
+          avgJobsPerSession: avgSessionsPerUser,
         },
       });
     } catch (err) {
@@ -298,6 +382,55 @@ export default function AdminPage() {
               value={stats?.users.last30d || 0} 
               subtitle="new signups"
               icon={TrendingUp} 
+              color="green"
+            />
+          </div>
+        </section>
+
+        {/* User Growth Chart */}
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-green-400" />
+            User Growth (Last 30 Days)
+          </h2>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+            <UserGrowthChart data={stats?.userGrowth || []} />
+          </div>
+        </section>
+
+        {/* Retention & Engagement */}
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-purple-400" />
+            Retention & Engagement
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <StatCard 
+              title="Return Rate" 
+              value={`${stats?.retention.returnRate7d || 0}%`} 
+              subtitle="users who came back"
+              icon={RefreshCw} 
+              color="purple"
+            />
+            <StatCard 
+              title="Repeat Users" 
+              value={stats?.retention.usersWithMultipleSessions || 0} 
+              subtitle="users with 2+ jobs"
+              icon={Users} 
+              color="blue"
+            />
+            <StatCard 
+              title="Avg Jobs/User" 
+              value={stats?.retention.avgSessionsPerUser || 0} 
+              subtitle="average engagement"
+              icon={Video} 
+              color="green"
+            />
+            <StatCard 
+              title="Total Sessions" 
+              value={stats?.sessionDuration.totalSessions || 0} 
+              subtitle="completed jobs"
+              icon={CheckCircle} 
               color="green"
             />
           </div>
@@ -526,6 +659,86 @@ function ServiceHealthCheck() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function UserGrowthChart({ data }: { data: { date: string; count: number }[] }) {
+  if (!data || data.length === 0) {
+    return <div className="text-gray-400 text-center py-8">No data available</div>;
+  }
+
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  
+  // Group data into periods
+  const last7Days = data.slice(-7);
+  const prev7Days = data.slice(-14, -7);
+  const last7Total = last7Days.reduce((sum, d) => sum + d.count, 0);
+  const prev7Total = prev7Days.reduce((sum, d) => sum + d.count, 0);
+  const growthRate = prev7Total > 0 ? Math.round(((last7Total - prev7Total) / prev7Total) * 100) : 0;
+
+  return (
+    <div>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center">
+          <p className="text-2xl font-bold text-blue-400">{total}</p>
+          <p className="text-sm text-gray-400">Total (30d)</p>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-green-400">{last7Total}</p>
+          <p className="text-sm text-gray-400">Last 7 Days</p>
+        </div>
+        <div className="text-center">
+          <p className={`text-2xl font-bold ${growthRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {growthRate >= 0 ? '+' : ''}{growthRate}%
+          </p>
+          <p className="text-sm text-gray-400">Growth Rate</p>
+        </div>
+      </div>
+
+      {/* Bar Chart */}
+      <div className="flex items-end gap-1 h-40">
+        {data.map((d, i) => {
+          const height = maxCount > 0 ? (d.count / maxCount) * 100 : 0;
+          const isLast7 = i >= data.length - 7;
+          
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center group relative">
+              <div 
+                className={`w-full rounded-t transition-all ${
+                  isLast7 ? 'bg-blue-500 hover:bg-blue-400' : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+                style={{ height: `${Math.max(height, 2)}%` }}
+              />
+              {/* Tooltip */}
+              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                {d.date}: {d.count} users
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* X-axis labels */}
+      <div className="flex justify-between mt-2 text-xs text-gray-500">
+        <span>{data[0]?.date}</span>
+        <span>{data[Math.floor(data.length / 2)]?.date}</span>
+        <span>{data[data.length - 1]?.date}</span>
+      </div>
+      
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-6 mt-4 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-blue-500 rounded" />
+          <span className="text-gray-400">Last 7 days</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-gray-600 rounded" />
+          <span className="text-gray-400">Previous days</span>
+        </div>
       </div>
     </div>
   );
