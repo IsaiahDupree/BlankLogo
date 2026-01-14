@@ -64,23 +64,23 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white">
       {/* Header */}
-      <header className="container mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <span className="text-xl font-bold">B</span>
+      <header className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <span className="text-lg sm:text-xl font-bold">B</span>
           </div>
-          <span className="text-xl font-bold">BlankLogo</span>
-        </div>
-        <nav className="flex items-center gap-6">
-          <Link href="/pricing" className="text-gray-300 hover:text-white transition">
+          <span className="text-lg sm:text-xl font-bold">BlankLogo</span>
+        </Link>
+        <nav className="flex items-center gap-3 sm:gap-6">
+          <Link href="/pricing" className="hidden sm:block text-gray-300 hover:text-white transition text-sm sm:text-base">
             Pricing
           </Link>
-          <Link href="#platforms" className="text-gray-300 hover:text-white transition">
+          <Link href="#platforms" className="hidden sm:block text-gray-300 hover:text-white transition text-sm sm:text-base">
             Platforms
           </Link>
           <Link
             href="/signup"
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition font-medium text-sm sm:text-base"
             onClick={() => handleCTAClick('Get Started', 'header')}
           >
             Get Started
