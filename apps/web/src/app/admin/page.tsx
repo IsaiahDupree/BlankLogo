@@ -13,7 +13,8 @@ import {
   XCircle,
   Loader2,
   RefreshCw,
-  Shield
+  Shield,
+  Mail
 } from "lucide-react";
 
 // Admin emails allowed to access this page
@@ -76,6 +77,15 @@ interface AdminStats {
     avgDurationMs: number;
     totalSessions: number;
     avgJobsPerSession: number;
+  };
+  emails: {
+    total: number;
+    sent: number;
+    pending: number;
+    failed: number;
+    last24h: number;
+    last7d: number;
+    byType: Record<string, number>;
   };
 }
 
@@ -309,6 +319,38 @@ export default function AdminPage() {
         ? Math.round((usersWithMultipleSessions / totalUsersWithSessions) * 100) 
         : 0;
 
+      // Fetch email stats from both email_log and bl_notification_outbox
+      const { data: emailLogs } = await supabase
+        .from("email_log")
+        .select("id, status, kind, created_at");
+      
+      const { data: notificationOutbox } = await supabase
+        .from("bl_notification_outbox")
+        .select("id, status, type, created_at");
+      
+      // Combine both sources
+      const allEmails = [
+        ...(emailLogs || []).map(e => ({ ...e, source: 'email_log' })),
+        ...(notificationOutbox || []).map(e => ({ ...e, kind: e.type, source: 'notification' })),
+      ];
+      
+      const emailsSent = allEmails.filter(e => e.status === 'sent' || e.status === 'delivered').length;
+      const emailsPending = allEmails.filter(e => e.status === 'pending' || e.status === 'queued').length;
+      const emailsFailed = allEmails.filter(e => e.status === 'failed' || e.status === 'error').length;
+      const emailsLast24h = allEmails.filter(e => 
+        new Date(e.created_at) > new Date(now.getTime() - day)
+      ).length;
+      const emailsLast7d = allEmails.filter(e => 
+        new Date(e.created_at) > new Date(now.getTime() - 7 * day)
+      ).length;
+      
+      // Group by type/kind
+      const emailsByType: Record<string, number> = {};
+      allEmails.forEach(e => {
+        const type = e.kind || 'unknown';
+        emailsByType[type] = (emailsByType[type] || 0) + 1;
+      });
+
       setStats({
         users: {
           total: users.length,
@@ -347,6 +389,15 @@ export default function AdminPage() {
           avgDurationMs: 0, // Would need actual session tracking
           totalSessions: jobsWithDuration?.length || 0,
           avgJobsPerSession: avgSessionsPerUser,
+        },
+        emails: {
+          total: allEmails.length,
+          sent: emailsSent,
+          pending: emailsPending,
+          failed: emailsFailed,
+          last24h: emailsLast24h,
+          last7d: emailsLast7d,
+          byType: emailsByType,
         },
       });
     } catch (err) {
@@ -612,6 +663,73 @@ export default function AdminPage() {
               color="purple"
             />
           </div>
+        </section>
+
+        {/* Email Stats */}
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
+            Emails
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <StatCard 
+              title="Total Emails" 
+              value={stats?.emails.total || 0} 
+              subtitle="all time"
+              icon={Mail} 
+              color="purple"
+            />
+            <StatCard 
+              title="Sent" 
+              value={stats?.emails.sent || 0} 
+              subtitle="delivered"
+              icon={CheckCircle} 
+              color="green"
+            />
+            <StatCard 
+              title="Pending" 
+              value={stats?.emails.pending || 0} 
+              subtitle="in queue"
+              icon={Clock} 
+              color="yellow"
+            />
+            <StatCard 
+              title="Failed" 
+              value={stats?.emails.failed || 0} 
+              subtitle="errors"
+              icon={XCircle} 
+              color="red"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            <StatCard 
+              title="Last 24h" 
+              value={stats?.emails.last24h || 0} 
+              icon={TrendingUp} 
+              color="blue"
+            />
+            <StatCard 
+              title="Last 7 Days" 
+              value={stats?.emails.last7d || 0} 
+              icon={TrendingUp} 
+              color="blue"
+            />
+          </div>
+          {stats?.emails.byType && Object.keys(stats.emails.byType).length > 0 && (
+            <div className="mt-4 bg-white/5 border border-white/10 rounded-xl p-4">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">By Type</h3>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(stats.emails.byType).map(([type, count]) => (
+                  <span 
+                    key={type}
+                    className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm"
+                  >
+                    {type}: {count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Service Health */}
