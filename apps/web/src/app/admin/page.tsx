@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { 
   Users, 
@@ -441,6 +442,14 @@ export default function AdminPage() {
             <p className="text-gray-400 mt-1 text-sm sm:text-base">BlankLogo site statistics</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Growth Center Link */}
+            <Link
+              href="/admin/growth"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition text-sm"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Growth Center
+            </Link>
             {/* Test Users Toggle */}
             <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
               <input
