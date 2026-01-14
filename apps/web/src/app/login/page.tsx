@@ -101,24 +101,59 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     console.log("[LOGIN] 🔵 Google sign-in clicked");
+    console.log("[LOGIN] 🔵 Window origin:", window.location.origin);
+    console.log("[LOGIN] 🔵 Redirect URL will be:", `${window.location.origin}/auth/callback`);
+    console.log("[LOGIN] 🔵 Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+    try {
+      console.log("[LOGIN] 🔵 Calling supabase.auth.signInWithOAuth...");
+      const startTime = Date.now();
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      console.error("[LOGIN] ❌ Google login failed:", error.message);
-      setError(error.message);
-      phError.ui({ error_code: 'E_AUTH_FAILED', route: '/login', message: error.message });
+      const duration = Date.now() - startTime;
+      console.log("[LOGIN] 🔵 OAuth request took:", duration, "ms");
+      console.log("[LOGIN] 🔵 OAuth response data:", data);
+      console.log("[LOGIN] 🔵 OAuth provider:", data?.provider);
+      console.log("[LOGIN] 🔵 OAuth URL:", data?.url);
+
+      if (error) {
+        console.error("[LOGIN] ❌ Google OAuth error:", error.message);
+        console.error("[LOGIN] ❌ Error name:", error.name);
+        console.error("[LOGIN] ❌ Error status:", (error as any).status);
+        console.error("[LOGIN] ❌ Full error:", JSON.stringify(error, null, 2));
+        setError(error.message);
+        phError.ui({ error_code: 'E_AUTH_FAILED', route: '/login', message: error.message });
+        setLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        console.log("[LOGIN] 🔵 Redirecting to Google OAuth URL...");
+        // The SDK should auto-redirect, but log it
+      } else {
+        console.warn("[LOGIN] ⚠️ No OAuth URL returned - this may indicate a configuration issue");
+        setError("Failed to initiate Google sign-in. Please try again.");
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("[LOGIN] ❌ Google login exception:", err);
+      console.error("[LOGIN] ❌ Exception type:", typeof err);
+      console.error("[LOGIN] ❌ Exception message:", (err as Error).message);
+      setError("An unexpected error occurred. Please try again.");
+      phError.ui({ error_code: 'E_AUTH_FAILED', route: '/login', message: (err as Error).message });
       setLoading(false);
     }
   }
