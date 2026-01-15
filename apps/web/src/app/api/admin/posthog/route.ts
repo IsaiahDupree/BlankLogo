@@ -13,6 +13,19 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.posthog
 const POSTHOG_PROJECT_ID = process.env.POSTHOG_PROJECT_ID || "";
 const POSTHOG_PERSONAL_API_KEY = process.env.POSTHOG_PERSONAL_API_KEY || "";
 
+// Admin/test user IDs to exclude from analytics (real users only)
+const EXCLUDED_USER_IDS = [
+  "67f1c269-494c-4749-8e3f-0817c5735d7a", // isaiahdupree33@gmail.com
+  "33b3a0fe-f1db-4602-b7e7-d0db520f27b5", // techmestuff3@gmail.com
+  "8678568e-fb54-4d48-a717-1dd6806a7a38", // sashleyblogs@gmail.com
+  "2958e3be-1538-4a9c-9529-5ee9003e2824", // techmestuff3+test1768141138138@gmail.com
+  "ffb17743-e0ea-420a-9108-390fc6f28f3b", // techmestuff3+test1768141017833@gmail.com
+  "873419e3-3ed6-49d6-b505-0d740e9c040a", // techmestuff3+test1768140971349@gmail.com
+];
+
+// Build HogQL exclusion clause for admin users
+const EXCLUDE_ADMINS_CLAUSE = `AND distinct_id NOT IN (${EXCLUDED_USER_IDS.map(id => `'${id}'`).join(", ")})`;
+
 // Verify admin access
 async function verifyAdmin(request: NextRequest): Promise<boolean> {
   const authHeader = request.headers.get("authorization");
@@ -191,7 +204,7 @@ export async function GET(request: NextRequest) {
       deviceBreakdownResult,
       engagementResult,
     ] = await Promise.all([
-      // Top pages
+      // Top pages (exclude admin users)
       queryPostHogHogQL(`
         SELECT 
           properties.$current_url as page,
@@ -199,12 +212,13 @@ export async function GET(request: NextRequest) {
         FROM events
         WHERE event = '$pageview'
           AND timestamp > now() - INTERVAL ${timeRange === "1h" ? "1 HOUR" : timeRange === "7d" ? "7 DAY" : "1 DAY"}
+          ${EXCLUDE_ADMINS_CLAUSE}
         GROUP BY page
         ORDER BY count DESC
         LIMIT 10
       `),
 
-      // Platform usage
+      // Platform usage (exclude admin users)
       queryPostHogHogQL(`
         SELECT 
           properties.platform as platform,
@@ -212,12 +226,13 @@ export async function GET(request: NextRequest) {
         FROM events
         WHERE event = 'platform_selected'
           AND timestamp > now() - INTERVAL ${timeRange === "1h" ? "1 HOUR" : timeRange === "7d" ? "7 DAY" : "1 DAY"}
+          ${EXCLUDE_ADMINS_CLAUSE}
         GROUP BY platform
         ORDER BY count DESC
         LIMIT 10
       `),
 
-      // Input mode (URL vs Upload)
+      // Input mode (URL vs Upload) - exclude admin users
       queryPostHogHogQL(`
         SELECT 
           properties.input_type as input_type,
@@ -225,10 +240,11 @@ export async function GET(request: NextRequest) {
         FROM events
         WHERE event IN ('url_submitted', 'video_upload_started')
           AND timestamp > now() - INTERVAL ${timeRange === "1h" ? "1 HOUR" : timeRange === "7d" ? "7 DAY" : "1 DAY"}
+          ${EXCLUDE_ADMINS_CLAUSE}
         GROUP BY input_type
       `),
 
-      // Device breakdown
+      // Device breakdown (exclude admin users)
       queryPostHogHogQL(`
         SELECT 
           properties.$device_type as device,
@@ -236,10 +252,11 @@ export async function GET(request: NextRequest) {
         FROM events
         WHERE event = '$pageview'
           AND timestamp > now() - INTERVAL ${timeRange === "1h" ? "1 HOUR" : timeRange === "7d" ? "7 DAY" : "1 DAY"}
+          ${EXCLUDE_ADMINS_CLAUSE}
         GROUP BY device
       `),
 
-      // Engagement metrics (scroll depth, rage clicks, etc.)
+      // Engagement metrics (exclude admin users)
       queryPostHogHogQL(`
         SELECT 
           event,
@@ -248,6 +265,7 @@ export async function GET(request: NextRequest) {
         FROM events
         WHERE event IN ('scroll_milestone', 'rage_click', 'user_idle', 'form_abandoned')
           AND timestamp > now() - INTERVAL ${timeRange === "1h" ? "1 HOUR" : timeRange === "7d" ? "7 DAY" : "1 DAY"}
+          ${EXCLUDE_ADMINS_CLAUSE}
         GROUP BY event
       `),
     ]);
@@ -295,20 +313,23 @@ export async function GET(request: NextRequest) {
     const idleSessions = Number(engagementData.find(([e]) => e === "user_idle")?.[1] || 0);
     const formAbandonment = Number(engagementData.find(([e]) => e === "form_abandoned")?.[1] || 0);
 
-    // Format events for response
+    // Format events for response (filter out admin users)
     const formattedEvents = (recentEvents as Array<{
       id: string;
       event: string;
       timestamp: string;
       properties: Record<string, unknown>;
       distinct_id?: string;
-    }>).slice(0, 20).map((e) => ({
-      id: e.id,
-      event: e.event,
-      timestamp: e.timestamp,
-      properties: e.properties || {},
-      user_id: e.distinct_id,
-    }));
+    }>)
+      .filter((e) => !EXCLUDED_USER_IDS.includes(e.distinct_id || ""))
+      .slice(0, 20)
+      .map((e) => ({
+        id: e.id,
+        event: e.event,
+        timestamp: e.timestamp,
+        properties: e.properties || {},
+        user_id: e.distinct_id,
+      }));
 
     // Build stats object
     const stats = {
