@@ -252,11 +252,19 @@ export async function GET(request: NextRequest) {
       `),
     ]);
 
-    // Process page views
-    const pageViews = (pageViewsResult as Array<[string, number]>).map(([page, count]) => ({
-      page: page ? new URL(page).pathname : "/unknown",
-      count: Number(count),
-    }));
+    // Process page views (safely extract pathname)
+    const pageViews = (pageViewsResult as Array<[string, number]>).map(([page, count]) => {
+      let pathname = "/unknown";
+      if (page) {
+        try {
+          pathname = new URL(page).pathname;
+        } catch {
+          // If not a valid URL, use the value directly (might be a path)
+          pathname = page.startsWith("/") ? page : `/${page}`;
+        }
+      }
+      return { page: pathname, count: Number(count) };
+    });
 
     // Process platform usage
     const platformUsage = (platformUsageResult as Array<[string, number]>).map(([platform, count]) => ({
