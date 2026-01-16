@@ -23,6 +23,23 @@ export default function LoginPage() {
     console.log("[LOGIN PAGE] Supabase client initialized");
     // Track login page view for Meta Pixel
     trackViewContent({ contentName: 'Login Page', contentCategory: 'auth' });
+    
+    // Capture UTM parameters and referrer for attribution tracking (for users coming from campaigns)
+    const params = new URLSearchParams(window.location.search);
+    const attribution = {
+      utm_source: params.get('utm_source') || undefined,
+      utm_medium: params.get('utm_medium') || undefined,
+      utm_campaign: params.get('utm_campaign') || undefined,
+      utm_content: params.get('utm_content') || undefined,
+      utm_term: params.get('utm_term') || undefined,
+      referrer: document.referrer || undefined,
+      landing_page: window.location.pathname,
+      timestamp: new Date().toISOString(),
+    };
+    // Store attribution data for potential use
+    localStorage.setItem('bl_signup_attribution', JSON.stringify(attribution));
+    document.cookie = `bl_signup_attribution=${encodeURIComponent(JSON.stringify(attribution))}; path=/; max-age=3600; SameSite=Lax`;
+    
     return () => {
       console.log("[LOGIN PAGE] 🔐 Page unmounted");
     };

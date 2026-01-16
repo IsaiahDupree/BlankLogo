@@ -1,7 +1,22 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 const WELCOME_CREDITS = 10;
+
+// Helper to parse attribution cookie
+function getAttributionFromCookies(): Record<string, string | undefined> | null {
+  try {
+    const cookieStore = cookies();
+    const attributionCookie = cookieStore.get('bl_signup_attribution');
+    if (attributionCookie?.value) {
+      return JSON.parse(decodeURIComponent(attributionCookie.value));
+    }
+  } catch (e) {
+    console.error('[Auth Callback] Failed to parse attribution cookie:', e);
+  }
+  return null;
+}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -9,6 +24,9 @@ export async function GET(request: Request) {
   const error_param = requestUrl.searchParams.get("error");
   const error_description = requestUrl.searchParams.get("error_description");
   const origin = requestUrl.origin;
+  
+  // Get attribution data from cookie (set during signup)
+  const attribution = getAttributionFromCookies();
 
   console.log("[Auth Callback] 🔄 Callback received");
   console.log("[Auth Callback] Full URL:", request.url);
@@ -70,6 +88,34 @@ export async function GET(request: Request) {
           console.error('[Auth Callback] Insert error:', insertError);
         } else {
           console.log(`[Auth Callback] Granted ${WELCOME_CREDITS} welcome credits to new user:`, data.user.id);
+        }
+        
+        // Log signup event with attribution data for analytics
+        const userAgent = request.headers.get('user-agent') || undefined;
+        const forwardedFor = request.headers.get('x-forwarded-for');
+        const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : undefined;
+        
+        const { error: eventError } = await adminSupabase.from('bl_auth_events').insert({
+          user_id: data.user.id,
+          event_type: 'signup',
+          event_status: 'success',
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          metadata: attribution ? {
+            utm_source: attribution.utm_source,
+            utm_medium: attribution.utm_medium,
+            utm_campaign: attribution.utm_campaign,
+            utm_content: attribution.utm_content,
+            utm_term: attribution.utm_term,
+            referrer: attribution.referrer,
+            landing_page: attribution.landing_page,
+          } : { utm_source: 'direct' },
+        });
+        
+        if (eventError) {
+          console.error('[Auth Callback] Failed to log signup event:', eventError);
+        } else {
+          console.log('[Auth Callback] 📊 Signup event logged with attribution:', attribution);
         }
       } else {
         console.log('[Auth Callback] User already has signup bonus, skipping');

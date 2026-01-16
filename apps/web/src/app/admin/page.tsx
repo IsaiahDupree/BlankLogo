@@ -15,7 +15,9 @@ import {
   Loader2,
   RefreshCw,
   Shield,
-  Mail
+  Mail,
+  Globe,
+  ExternalLink
 } from "lucide-react";
 
 // Admin emails allowed to access this page
@@ -87,6 +89,13 @@ interface AdminStats {
     last24h: number;
     last7d: number;
     byType: Record<string, number>;
+  };
+  sources: {
+    utmSources: Record<string, number>;
+    utmMediums: Record<string, number>;
+    utmCampaigns: Record<string, number>;
+    referrers: Record<string, number>;
+    total: number;
   };
 }
 
@@ -352,6 +361,61 @@ export default function AdminPage() {
         emailsByType[type] = (emailsByType[type] || 0) + 1;
       });
 
+      // Fetch auth events for user acquisition sources (UTM, referrers)
+      const { data: authEvents } = await supabase
+        .from("bl_auth_events")
+        .select("user_id, metadata, created_at")
+        .eq("event_type", "signup");
+
+      // Process source data from auth events
+      const utmSources: Record<string, number> = {};
+      const utmMediums: Record<string, number> = {};
+      const utmCampaigns: Record<string, number> = {};
+      const referrers: Record<string, number> = {};
+      
+      authEvents?.forEach(event => {
+        const metadata = event.metadata as {
+          utm_source?: string;
+          utm_medium?: string;
+          utm_campaign?: string;
+          referrer?: string;
+        } | null;
+        
+        if (metadata) {
+          // UTM Source
+          const source = metadata.utm_source || 'direct';
+          utmSources[source] = (utmSources[source] || 0) + 1;
+          
+          // UTM Medium
+          if (metadata.utm_medium) {
+            utmMediums[metadata.utm_medium] = (utmMediums[metadata.utm_medium] || 0) + 1;
+          }
+          
+          // UTM Campaign
+          if (metadata.utm_campaign) {
+            utmCampaigns[metadata.utm_campaign] = (utmCampaigns[metadata.utm_campaign] || 0) + 1;
+          }
+          
+          // Referrer domain
+          if (metadata.referrer) {
+            try {
+              const refUrl = new URL(metadata.referrer);
+              const domain = refUrl.hostname.replace('www.', '');
+              referrers[domain] = (referrers[domain] || 0) + 1;
+            } catch {
+              referrers['unknown'] = (referrers['unknown'] || 0) + 1;
+            }
+          }
+        } else {
+          utmSources['direct'] = (utmSources['direct'] || 0) + 1;
+        }
+      });
+
+      // If no auth events, fall back to user count as direct
+      if (!authEvents || authEvents.length === 0) {
+        utmSources['direct'] = users.length;
+      }
+
       setStats({
         users: {
           total: users.length,
@@ -399,6 +463,13 @@ export default function AdminPage() {
           last24h: emailsLast24h,
           last7d: emailsLast7d,
           byType: emailsByType,
+        },
+        sources: {
+          utmSources,
+          utmMediums,
+          utmCampaigns,
+          referrers,
+          total: authEvents?.length || users.length,
         },
       });
     } catch (err) {
@@ -449,6 +520,14 @@ export default function AdminPage() {
             >
               <TrendingUp className="w-4 h-4" />
               Growth Center
+            </Link>
+            {/* Live Tracking Link */}
+            <Link
+              href="/admin/tracking"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg transition text-sm"
+            >
+              <Clock className="w-4 h-4" />
+              Live Tracking
             </Link>
             {/* Test Users Toggle */}
             <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
@@ -737,6 +816,129 @@ export default function AdminPage() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* User Sources */}
+        <section className="mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+            User Sources
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* UTM Sources */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
+              <h3 className="text-sm font-medium text-gray-400 mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Traffic Sources (UTM)
+              </h3>
+              {stats?.sources.utmSources && Object.keys(stats.sources.utmSources).length > 0 ? (
+                <div className="space-y-3">
+                  {Object.entries(stats.sources.utmSources)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 8)
+                    .map(([source, count]) => {
+                      const total = stats.sources.total || 1;
+                      const percentage = Math.round((count / total) * 100);
+                      return (
+                        <div key={source}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-300 capitalize">{source}</span>
+                            <span className="text-gray-400">{count} ({percentage}%)</span>
+                          </div>
+                          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">No source data available</p>
+              )}
+            </div>
+
+            {/* Referrer Domains */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
+              <h3 className="text-sm font-medium text-gray-400 mb-4 flex items-center gap-2">
+                <ExternalLink className="w-4 h-4" />
+                Referrer Domains
+              </h3>
+              {stats?.sources.referrers && Object.keys(stats.sources.referrers).length > 0 ? (
+                <div className="space-y-3">
+                  {Object.entries(stats.sources.referrers)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 8)
+                    .map(([domain, count]) => {
+                      const total = Object.values(stats.sources.referrers).reduce((a, b) => a + b, 0);
+                      const percentage = Math.round((count / total) * 100);
+                      return (
+                        <div key={domain}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-300">{domain}</span>
+                            <span className="text-gray-400">{count} ({percentage}%)</span>
+                          </div>
+                          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">No referrer data tracked yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* UTM Mediums & Campaigns */}
+          {((stats?.sources.utmMediums && Object.keys(stats.sources.utmMediums).length > 0) ||
+            (stats?.sources.utmCampaigns && Object.keys(stats.sources.utmCampaigns).length > 0)) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+              {/* UTM Mediums */}
+              {stats?.sources.utmMediums && Object.keys(stats.sources.utmMediums).length > 0 && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Mediums</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(stats.sources.utmMediums)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([medium, count]) => (
+                        <span 
+                          key={medium}
+                          className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm"
+                        >
+                          {medium}: {count}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* UTM Campaigns */}
+              {stats?.sources.utmCampaigns && Object.keys(stats.sources.utmCampaigns).length > 0 && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Campaigns</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(stats.sources.utmCampaigns)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([campaign, count]) => (
+                        <span 
+                          key={campaign}
+                          className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm"
+                        >
+                          {campaign}: {count}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>

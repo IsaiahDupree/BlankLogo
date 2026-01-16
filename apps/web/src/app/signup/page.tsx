@@ -29,6 +29,25 @@ export default function SignupPage() {
     trackLead({ contentName: 'Signup Started' });
     // Store signup start time for activation tracking
     localStorage.setItem('bl_signup_start_time', Date.now().toString());
+    
+    // Capture UTM parameters and referrer for attribution tracking
+    const params = new URLSearchParams(window.location.search);
+    const attribution = {
+      utm_source: params.get('utm_source') || undefined,
+      utm_medium: params.get('utm_medium') || undefined,
+      utm_campaign: params.get('utm_campaign') || undefined,
+      utm_content: params.get('utm_content') || undefined,
+      utm_term: params.get('utm_term') || undefined,
+      referrer: document.referrer || undefined,
+      landing_page: window.location.pathname,
+      timestamp: new Date().toISOString(),
+    };
+    // Store attribution data for auth callback to use (both localStorage and cookie for server access)
+    localStorage.setItem('bl_signup_attribution', JSON.stringify(attribution));
+    // Set cookie for server-side access in auth callback (expires in 1 hour)
+    document.cookie = `bl_signup_attribution=${encodeURIComponent(JSON.stringify(attribution))}; path=/; max-age=3600; SameSite=Lax`;
+    console.log("[SIGNUP PAGE] 📊 Attribution captured:", attribution);
+    
     return () => console.log("[SIGNUP PAGE] 📝 Page unmounted");
   }, []);
 
