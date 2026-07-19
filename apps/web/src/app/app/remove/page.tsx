@@ -6,7 +6,7 @@ import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Dow
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 import { trackGenerateRequested, trackMediaReady, trackDownload } from "@/lib/meta-pixel";
-import { upload, job as phJob, error as phError, generateRequestId } from "@/lib/posthog-events";
+import { upload, job as phJob, error as phError, generateRequestId, ui, platform as platformEvents, video as videoEvents, form as formEvents } from "@/lib/posthog-events";
 
 // Logging utility
 function logRemove(message: string, data?: unknown) {
@@ -748,7 +748,12 @@ export default function RemoveWatermarkPage() {
         <div className="flex gap-2 p-1 rounded-lg bg-white/5">
           <button
             type="button"
-            onClick={() => setMode("url")}
+            onClick={() => {
+              if (mode !== "url") {
+                ui.tabSwitched({ from_tab: mode, to_tab: "url", tab_group: "input_mode", page_path: "/app/remove" });
+              }
+              setMode("url");
+            }}
             data-testid="mode-url"
             className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
               mode === "url" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
@@ -759,7 +764,12 @@ export default function RemoveWatermarkPage() {
           </button>
           <button
             type="button"
-            onClick={() => setMode("upload")}
+            onClick={() => {
+              if (mode !== "upload") {
+                ui.tabSwitched({ from_tab: mode, to_tab: "upload", tab_group: "input_mode", page_path: "/app/remove" });
+              }
+              setMode("upload");
+            }}
             data-testid="mode-upload"
             className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
               mode === "upload" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
@@ -840,7 +850,13 @@ export default function RemoveWatermarkPage() {
           {/* Auto-Detect - Featured Option */}
           <button
             type="button"
-            onClick={() => setPlatform("auto")}
+            onClick={() => {
+              const prev = platform;
+              setPlatform("auto");
+              if (prev !== "auto") {
+                platformEvents.platformSelected({ platform_id: "auto", platform_name: "Auto-Detect", selection_method: "click", previous_platform: prev });
+              }
+            }}
             data-testid="platform-auto"
             className={`w-full mb-4 p-4 rounded-xl border text-left transition flex items-center gap-4 ${
               platform === "auto"
@@ -871,7 +887,13 @@ export default function RemoveWatermarkPage() {
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setPlatform(p.id)}
+                onClick={() => {
+                  const prev = platform;
+                  setPlatform(p.id);
+                  if (prev !== p.id) {
+                    platformEvents.platformSelected({ platform_id: p.id, platform_name: p.name, selection_method: "click", previous_platform: prev });
+                  }
+                }}
                 data-testid={`platform-${p.id}`}
                 className={`p-2 rounded-lg border text-center transition ${
                   platform === p.id

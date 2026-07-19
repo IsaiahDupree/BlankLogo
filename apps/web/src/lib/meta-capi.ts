@@ -157,6 +157,37 @@ export async function trackSubscribeCAPI(params: {
   });
 }
 
+// Track PageView event (for CAPI deduplication with client pixel)
+export async function trackPageViewCAPI(params: {
+  eventId: string;
+  sourceUrl: string;
+  userId?: string;
+  email?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  fbc?: string; // Facebook click ID from _fbc cookie
+  fbp?: string; // Facebook browser ID from _fbp cookie
+}): Promise<boolean> {
+  const hashedEmail = params.email ? [await sha256(params.email)] : undefined;
+  const hashedUserId = params.userId ? [await sha256(params.userId)] : undefined;
+
+  return sendCAPIEvent({
+    event_name: 'PageView',
+    event_time: Math.floor(Date.now() / 1000),
+    event_id: params.eventId,
+    event_source_url: params.sourceUrl,
+    action_source: 'website',
+    user_data: {
+      em: hashedEmail,
+      external_id: hashedUserId,
+      client_ip_address: params.ipAddress,
+      client_user_agent: params.userAgent,
+      fbc: params.fbc,
+      fbp: params.fbp,
+    },
+  });
+}
+
 // Generate event_id for CAPI (same format as client-side)
 export function generateEventId(prefix: string = 'evt'): string {
   const timestamp = Date.now().toString(36);

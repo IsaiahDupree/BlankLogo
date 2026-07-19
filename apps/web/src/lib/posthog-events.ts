@@ -743,6 +743,552 @@ export const credits = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
+// I) NAVIGATION & PAGE EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const navigation = {
+  /** Page viewed with full context */
+  pageViewed: (props: {
+    page_path: string;
+    page_title?: string;
+    referrer?: string;
+    time_on_previous_page_ms?: number;
+    scroll_depth_previous?: number;
+    entry_type?: 'direct' | 'internal' | 'external' | 'back';
+  }) => {
+    track('page_viewed', { ...getPersistedAttribution(), ...props });
+  },
+
+  /** Page left (for session analysis) */
+  pageLeft: (props: {
+    page_path: string;
+    time_on_page_ms: number;
+    scroll_depth_max: number;
+    interactions_count: number;
+    exit_type: 'navigation' | 'close' | 'external';
+  }) => {
+    track('page_left', props);
+  },
+
+  /** Internal navigation clicked */
+  linkClicked: (props: {
+    from_path: string;
+    to_path: string;
+    link_text?: string;
+    link_location: 'nav' | 'sidebar' | 'content' | 'footer' | 'cta' | 'card';
+  }) => {
+    track('link_clicked', props);
+  },
+
+  /** Back/forward navigation */
+  historyNavigation: (props: {
+    direction: 'back' | 'forward';
+    from_path: string;
+    to_path: string;
+  }) => {
+    track('history_navigation', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// J) UI INTERACTION EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const ui = {
+  /** Button clicked */
+  buttonClicked: (props: {
+    button_text: string;
+    button_id?: string;
+    button_type: 'primary' | 'secondary' | 'icon' | 'link' | 'submit' | 'toggle';
+    page_path: string;
+    section?: string;
+  }) => {
+    track('button_clicked', props);
+  },
+
+  /** Tab/mode switched */
+  tabSwitched: (props: {
+    from_tab: string;
+    to_tab: string;
+    tab_group: string;
+    page_path: string;
+  }) => {
+    track('tab_switched', props);
+  },
+
+  /** Dropdown/select changed */
+  selectChanged: (props: {
+    field_name: string;
+    from_value?: string;
+    to_value: string;
+    page_path: string;
+  }) => {
+    track('select_changed', props);
+  },
+
+  /** Toggle switched */
+  toggleSwitched: (props: {
+    toggle_name: string;
+    new_value: boolean;
+    page_path: string;
+    section?: string;
+  }) => {
+    track('toggle_switched', props);
+  },
+
+  /** Modal/dialog opened */
+  modalOpened: (props: {
+    modal_name: string;
+    trigger: string;
+    page_path: string;
+  }) => {
+    track('modal_opened', props);
+  },
+
+  /** Modal/dialog closed */
+  modalClosed: (props: {
+    modal_name: string;
+    close_method: 'button' | 'backdrop' | 'escape' | 'action';
+    time_open_ms: number;
+    page_path: string;
+  }) => {
+    track('modal_closed', props);
+  },
+
+  /** Tooltip/popover shown */
+  tooltipShown: (props: {
+    tooltip_id: string;
+    trigger_element: string;
+    page_path: string;
+  }) => {
+    track('tooltip_shown', props);
+  },
+
+  /** Accordion/expandable expanded */
+  sectionExpanded: (props: {
+    section_name: string;
+    is_expanded: boolean;
+    page_path: string;
+  }) => {
+    track('section_expanded', props);
+  },
+
+  /** Copy to clipboard */
+  copiedToClipboard: (props: {
+    content_type: 'url' | 'code' | 'text' | 'id';
+    page_path: string;
+    element_id?: string;
+  }) => {
+    track('copied_to_clipboard', props);
+  },
+
+  /** Drag and drop action */
+  dragDropAction: (props: {
+    action: 'drag_start' | 'drag_end' | 'drop';
+    element_type: string;
+    page_path: string;
+    success?: boolean;
+  }) => {
+    track('drag_drop_action', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// K) FORM INTERACTION EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const form = {
+  /** Form started (first interaction) */
+  formStarted: (props: {
+    form_name: string;
+    page_path: string;
+    first_field?: string;
+  }) => {
+    track('form_started', props);
+  },
+
+  /** Form field focused */
+  fieldFocused: (props: {
+    form_name: string;
+    field_name: string;
+    field_type: 'text' | 'email' | 'password' | 'url' | 'file' | 'select' | 'textarea' | 'checkbox';
+    page_path: string;
+  }) => {
+    track('field_focused', props);
+  },
+
+  /** Form field blurred (left) */
+  fieldBlurred: (props: {
+    form_name: string;
+    field_name: string;
+    has_value: boolean;
+    time_focused_ms: number;
+    page_path: string;
+  }) => {
+    track('field_blurred', props);
+  },
+
+  /** Form field validation error shown */
+  fieldError: (props: {
+    form_name: string;
+    field_name: string;
+    error_type: 'required' | 'format' | 'length' | 'custom';
+    error_message?: string;
+    page_path: string;
+  }) => {
+    track('field_error', props);
+  },
+
+  /** Form submitted */
+  formSubmitted: (props: {
+    form_name: string;
+    page_path: string;
+    time_to_complete_ms: number;
+    fields_filled: number;
+    fields_total: number;
+  }) => {
+    track('form_submitted', props);
+  },
+
+  /** Form abandoned (left without submit) */
+  formAbandoned: (props: {
+    form_name: string;
+    page_path: string;
+    time_spent_ms: number;
+    last_field_focused?: string;
+    fields_filled: number;
+    fields_total: number;
+  }) => {
+    track('form_abandoned', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// L) VIDEO PLAYER EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const video = {
+  /** Video player loaded */
+  playerLoaded: (props: {
+    video_id?: string;
+    video_type: 'input' | 'output' | 'preview' | 'comparison';
+    page_path: string;
+    autoplay: boolean;
+  }) => {
+    track('video_player_loaded', props);
+  },
+
+  /** Video play started */
+  playStarted: (props: {
+    video_id?: string;
+    video_type: 'input' | 'output' | 'preview' | 'comparison';
+    page_path: string;
+    current_time_sec: number;
+  }) => {
+    track('video_play_started', props);
+  },
+
+  /** Video paused */
+  paused: (props: {
+    video_id?: string;
+    video_type: string;
+    page_path: string;
+    current_time_sec: number;
+    watch_duration_sec: number;
+  }) => {
+    track('video_paused', props);
+  },
+
+  /** Video seeked */
+  seeked: (props: {
+    video_id?: string;
+    video_type: string;
+    page_path: string;
+    from_time_sec: number;
+    to_time_sec: number;
+  }) => {
+    track('video_seeked', props);
+  },
+
+  /** Video ended (watched to completion) */
+  ended: (props: {
+    video_id?: string;
+    video_type: string;
+    page_path: string;
+    total_watch_time_sec: number;
+    video_duration_sec: number;
+    completion_percent: number;
+  }) => {
+    track('video_ended', props);
+  },
+
+  /** Video fullscreen toggled */
+  fullscreenToggled: (props: {
+    video_id?: string;
+    video_type: string;
+    page_path: string;
+    is_fullscreen: boolean;
+  }) => {
+    track('video_fullscreen_toggled', props);
+  },
+
+  /** Video mute toggled */
+  muteToggled: (props: {
+    video_id?: string;
+    video_type: string;
+    page_path: string;
+    is_muted: boolean;
+  }) => {
+    track('video_mute_toggled', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// M) ENGAGEMENT & SESSION EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const engagement = {
+  /** Scroll milestone reached */
+  scrollMilestone: (props: {
+    page_path: string;
+    depth_percent: 25 | 50 | 75 | 90 | 100;
+    time_to_reach_ms: number;
+  }) => {
+    track('scroll_milestone', props);
+  },
+
+  /** User idle detected (no activity for X seconds) */
+  userIdle: (props: {
+    page_path: string;
+    idle_duration_sec: number;
+    last_interaction_type?: string;
+  }) => {
+    track('user_idle', props);
+  },
+
+  /** User returned from idle */
+  userReturned: (props: {
+    page_path: string;
+    idle_duration_sec: number;
+    return_interaction_type: string;
+  }) => {
+    track('user_returned', props);
+  },
+
+  /** Rage click detected (multiple rapid clicks) */
+  rageClick: (props: {
+    page_path: string;
+    element_selector?: string;
+    click_count: number;
+    time_window_ms: number;
+  }) => {
+    track('rage_click', props);
+  },
+
+  /** Element hovered for significant time */
+  elementHovered: (props: {
+    element_type: string;
+    element_id?: string;
+    hover_duration_ms: number;
+    page_path: string;
+  }) => {
+    // Only track if hovered > 1 second (meaningful engagement)
+    if (props.hover_duration_ms >= 1000) {
+      track('element_hovered', props);
+    }
+  },
+
+  /** Session heartbeat (periodic engagement check) */
+  sessionHeartbeat: (props: {
+    page_path: string;
+    session_duration_sec: number;
+    pages_viewed: number;
+    interactions_count: number;
+    is_active: boolean;
+  }) => {
+    track('session_heartbeat', props);
+  },
+
+  /** Tab visibility changed */
+  tabVisibilityChanged: (props: {
+    page_path: string;
+    is_visible: boolean;
+    hidden_duration_sec?: number;
+  }) => {
+    track('tab_visibility_changed', props);
+  },
+
+  /** Feature discovered (first time using a feature) */
+  featureDiscovered: (props: {
+    feature_name: string;
+    discovery_method: 'click' | 'hover' | 'scroll' | 'search';
+    page_path: string;
+  }) => {
+    track('feature_discovered', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// N) SETTINGS & PREFERENCES EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const settings = {
+  /** Settings page viewed */
+  settingsViewed: (props: { section?: string }) => {
+    track('settings_viewed', props);
+  },
+
+  /** Setting changed */
+  settingChanged: (props: {
+    setting_name: string;
+    setting_category: 'notifications' | 'privacy' | 'display' | 'account';
+    old_value: string | boolean | number;
+    new_value: string | boolean | number;
+  }) => {
+    track('setting_changed', props);
+  },
+
+  /** Notification preference changed */
+  notificationPrefChanged: (props: {
+    notification_type: string;
+    enabled: boolean;
+  }) => {
+    track('notification_pref_changed', props);
+  },
+
+  /** Account action taken */
+  accountAction: (props: {
+    action: 'password_change' | 'email_change' | 'delete_request' | 'export_data';
+    success: boolean;
+  }) => {
+    track('account_action', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// O) SEARCH & FILTER EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const search = {
+  /** Search performed */
+  searchPerformed: (props: {
+    query: string;
+    query_length: number;
+    search_type: 'jobs' | 'history' | 'global';
+    results_count: number;
+    page_path: string;
+  }) => {
+    track('search_performed', props);
+  },
+
+  /** Search result clicked */
+  searchResultClicked: (props: {
+    query: string;
+    result_position: number;
+    result_type: string;
+    page_path: string;
+  }) => {
+    track('search_result_clicked', props);
+  },
+
+  /** Filter applied */
+  filterApplied: (props: {
+    filter_name: string;
+    filter_value: string;
+    page_path: string;
+    results_count_before: number;
+    results_count_after: number;
+  }) => {
+    track('filter_applied', props);
+  },
+
+  /** Sort changed */
+  sortChanged: (props: {
+    sort_field: string;
+    sort_direction: 'asc' | 'desc';
+    page_path: string;
+  }) => {
+    track('sort_changed', props);
+  },
+
+  /** Pagination */
+  paginationUsed: (props: {
+    from_page: number;
+    to_page: number;
+    page_path: string;
+    items_per_page: number;
+  }) => {
+    track('pagination_used', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// P) PLATFORM SELECTION EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const platform = {
+  /** Platform selected for watermark removal */
+  platformSelected: (props: {
+    platform_id: string;
+    platform_name: string;
+    selection_method: 'click' | 'auto' | 'url_detect';
+    previous_platform?: string;
+  }) => {
+    track('platform_selected', props);
+  },
+
+  /** Platform info viewed (hover or click for details) */
+  platformInfoViewed: (props: {
+    platform_id: string;
+    view_duration_ms: number;
+  }) => {
+    track('platform_info_viewed', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Q) HELP & SUPPORT EVENTS (ML Training Data)
+// ═══════════════════════════════════════════════════════════════════
+
+export const help = {
+  /** Help content viewed */
+  helpViewed: (props: {
+    help_type: 'tooltip' | 'faq' | 'docs' | 'video';
+    help_topic: string;
+    page_path: string;
+  }) => {
+    track('help_viewed', props);
+  },
+
+  /** FAQ expanded */
+  faqExpanded: (props: {
+    question: string;
+    category?: string;
+    position: number;
+  }) => {
+    track('faq_expanded', props);
+  },
+
+  /** Support link clicked */
+  supportClicked: (props: {
+    support_type: 'email' | 'chat' | 'docs' | 'social';
+    page_path: string;
+    context?: string;
+  }) => {
+    track('support_clicked', props);
+  },
+
+  /** Feedback submitted */
+  feedbackSubmitted: (props: {
+    feedback_type: 'rating' | 'comment' | 'bug_report' | 'feature_request';
+    rating?: number;
+    page_path: string;
+  }) => {
+    track('feedback_submitted', props);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════
 
@@ -766,4 +1312,14 @@ export default {
   promo,
   credits,
   retention,
+  // New ML training events
+  navigation,
+  ui,
+  form,
+  video,
+  engagement,
+  settings,
+  search,
+  platform,
+  help,
 };

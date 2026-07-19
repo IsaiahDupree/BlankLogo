@@ -43,7 +43,7 @@ export default function RootLayout({
             });
           `}
         </Script>
-        {/* Meta Pixel Base Code */}
+        {/* Meta Pixel Base Code with CAPI Deduplication */}
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
@@ -55,7 +55,31 @@ export default function RootLayout({
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
             fbq('init', '${META_PIXEL_ID}');
-            fbq('track', 'PageView');
+            
+            // Generate event_id for CAPI deduplication
+            var eventId = 'pv_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,10);
+            fbq('track', 'PageView', { eventId: eventId });
+            
+            // Send to CAPI for deduplication (async, non-blocking)
+            (function() {
+              var cookies = document.cookie.split(';').reduce(function(acc, c) {
+                var parts = c.trim().split('=');
+                acc[parts[0]] = parts[1];
+                return acc;
+              }, {});
+              
+              fetch('/api/track/pageview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  eventId: eventId,
+                  sourceUrl: window.location.href,
+                  fbc: cookies['_fbc'],
+                  fbp: cookies['_fbp']
+                }),
+                keepalive: true
+              }).catch(function() {});
+            })();
           `}
         </Script>
         <noscript>

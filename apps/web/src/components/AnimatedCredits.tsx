@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Zap, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 
@@ -10,53 +10,61 @@ interface AnimatedCreditsProps {
 
 export function AnimatedCredits({ initialCredits }: AnimatedCreditsProps) {
   const [credits, setCredits] = useState(initialCredits);
-  const [previousCredits, setPreviousCredits] = useState(initialCredits);
   const [isAnimating, setIsAnimating] = useState(false);
   const [changeType, setChangeType] = useState<"increase" | "decrease" | null>(null);
   const [changeAmount, setChangeAmount] = useState(0);
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const creditsRef = useRef(initialCredits);
 
-  // Poll for credit changes every 30 seconds (reduced from 3s to avoid excessive requests)
-  useEffect(() => {
-    const fetchCredits = async () => {
-      try {
-        const res = await fetch("/api/credits");
-        if (res.ok) {
-          const data = await res.json();
-          const newCredits = data.credits ?? data.balance ?? initialCredits;
+  const fetchCredits = useCallback(async (isInitialFetch = false) => {
+    try {
+      const res = await fetch("/api/credits");
+      if (res.ok) {
+        const data = await res.json();
+        const newCredits = data.credits ?? data.balance ?? initialCredits;
+        
+        // On initial fetch, always update if different from initialCredits (fixes OAuth redirect stale cache)
+        const currentCredits = creditsRef.current;
+        const shouldUpdate = isInitialFetch ? newCredits !== initialCredits : newCredits !== currentCredits;
+        
+        if (shouldUpdate || (isInitialFetch && !hasFetchedOnce)) {
+          const diff = newCredits - currentCredits;
+          creditsRef.current = newCredits;
+          setCredits(newCredits);
           
-          if (newCredits !== credits) {
-            const diff = newCredits - credits;
-            setPreviousCredits(credits);
-            setCredits(newCredits);
+          // Only animate if it's a real change (not just initial sync)
+          if (!isInitialFetch && diff !== 0) {
             setChangeAmount(Math.abs(diff));
             setChangeType(diff > 0 ? "increase" : "decrease");
             setIsAnimating(true);
             
-            // Reset animation after 3 seconds
             setTimeout(() => {
               setIsAnimating(false);
               setChangeType(null);
             }, 3000);
           }
         }
-      } catch (error) {
-        // Silently fail - credits will update on next poll
+        setHasFetchedOnce(true);
       }
-    };
+    } catch (error) {
+      // Silently fail - credits will update on next poll
+    }
+  }, [initialCredits, hasFetchedOnce]);
 
-    // Initial fetch
-    fetchCredits();
-
-    // Poll every 30 seconds (was 3s - reduced to avoid excessive requests)
-    pollIntervalRef.current = setInterval(fetchCredits, 30000);
+  // Immediate fetch on mount to fix stale server-side cache after OAuth redirect
+  useEffect(() => {
+    fetchCredits(true);
+    
+    // Poll every 30 seconds
+    pollIntervalRef.current = setInterval(() => fetchCredits(false), 30000);
 
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [initialCredits]); // Removed 'credits' from deps to prevent re-creating interval on every update
+  }, [fetchCredits]);
 
   return (
     <Link 

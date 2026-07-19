@@ -9,7 +9,7 @@ import modal
 # Define the Modal app
 app = modal.App("blanklogo-watermark-removal")
 
-# Create image with all dependencies
+# Create image with all dependencies (including Real-ESRGAN for upscaling)
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "git", "libgl1-mesa-glx", "libglib2.0-0")
@@ -23,6 +23,11 @@ image = (
         "numpy<2",
         "opencv-python-headless",
         "fastapi",
+        # Real-ESRGAN for AI upscaling
+        "basicsr>=1.4.2",
+        "realesrgan>=0.3.0",
+        "facexlib>=0.3.0",
+        "gfpgan>=1.3.8",
     )
     .run_commands(
         "git clone --depth 1 https://github.com/IsaiahDupree/BlankLogo.git /app/BlankLogo"
@@ -139,17 +144,20 @@ def health():
     return {"status": "ok", "service": "blanklogo-watermark-removal"}
 
 
-# Web endpoint for video processing (called by Render worker)
-@app.function(image=image, gpu=gpu_config, timeout=600, container_idle_timeout=60)
+# Web endpoint for video processing (called by Render worker or Safari Automation)
+# Supports watermark removal AND optional AI upscaling in one call
+@app.function(image=image, gpu=gpu_config, timeout=900, container_idle_timeout=60)
 @modal.web_endpoint(method="POST")
 def process_video_http(request: dict):
     """
-    HTTP endpoint for video processing.
+    HTTP endpoint for video processing with optional AI upscaling.
     
     Request body:
         video_bytes: base64-encoded video
         mode: "inpaint" | "crop" | "auto"
         platform: "sora" | "tiktok" | "runway"
+        upscale: true | false (optional, default false)
+        upscale_factor: 2 | 4 (optional, default 2)
     
     Response:
         video_bytes: base64-encoded processed video
@@ -175,46 +183,98 @@ def process_video_http(request: dict):
     video_b64 = request.get("video_bytes", "")
     mode = request.get("mode", "inpaint")
     platform = request.get("platform", "sora")
+    do_upscale = request.get("upscale", False)
+    upscale_factor = request.get("upscale_factor", 2)
     
     video_bytes = base64.b64decode(video_b64)
     
     start_time = time.time()
+    input_mb = len(video_bytes) / 1024 / 1024
+    
     logger.info(f"[Modal HTTP] Processing: mode={mode}, platform={platform}")
-    logger.info(f"[Modal HTTP] Input size: {len(video_bytes) / 1024 / 1024:.2f} MB")
+    logger.info(f"[Modal HTTP] Upscale: {do_upscale} ({upscale_factor}x)")
+    logger.info(f"[Modal HTTP] Input size: {input_mb:.2f} MB")
+    
+    stats = {
+        "mode": mode,
+        "platform": platform,
+        "input_size_mb": round(input_mb, 2),
+        "watermarks_detected": 0,
+        "frames_processed": 0,
+        "upscaled": False,
+        "upscale_factor": upscale_factor if do_upscale else 1,
+    }
     
     with tempfile.TemporaryDirectory() as tmp_dir:
         input_path = f"{tmp_dir}/input.mp4"
-        output_path = f"{tmp_dir}/output.mp4"
+        watermark_removed_path = f"{tmp_dir}/watermark_removed.mp4"
+        upscaled_path = f"{tmp_dir}/upscaled.mp4"
         
         # Write input video
         with open(input_path, "wb") as f:
             f.write(video_bytes)
         
-        # Process video
+        current_path = input_path
+        
+        # Step 1: Remove watermark
+        logger.info("[Modal HTTP] Step 1: Removing watermark...")
+        wm_start = time.time()
         processor = VideoProcessor(mode=ProcessingMode(mode))
-        result = processor.process(input_path, output_path)
+        result = processor.process(input_path, watermark_removed_path)
+        wm_time = time.time() - wm_start
+        
+        stats["watermarks_detected"] = result.get("watermarks_detected", 0)
+        stats["frames_processed"] = result.get("frames_processed", 0)
+        stats["watermark_time_s"] = round(wm_time, 2)
+        current_path = watermark_removed_path
+        
+        logger.info(f"[Modal HTTP]   Watermarks: {stats['watermarks_detected']}, Time: {wm_time:.1f}s")
+        
+        # Step 2: Upscale (if requested)
+        if do_upscale:
+            logger.info(f"[Modal HTTP] Step 2: Upscaling {upscale_factor}x with Real-ESRGAN...")
+            up_start = time.time()
+            
+            try:
+                from upscaler import VideoUpscaler
+                upscaler = VideoUpscaler(scale=upscale_factor)
+                up_result = upscaler.upscale_video(current_path, upscaled_path)
+                up_time = time.time() - up_start
+                
+                stats["upscaled"] = True
+                stats["input_resolution"] = up_result.get("input_resolution", "")
+                stats["output_resolution"] = up_result.get("output_resolution", "")
+                stats["upscale_time_s"] = round(up_time, 2)
+                current_path = upscaled_path
+                
+                logger.info(f"[Modal HTTP]   Resolution: {stats['input_resolution']} → {stats['output_resolution']}")
+                logger.info(f"[Modal HTTP]   Time: {up_time:.1f}s")
+            except Exception as e:
+                logger.error(f"[Modal HTTP] Upscaling failed: {e}")
+                # Continue without upscaling
         
         # Read output video
-        with open(output_path, "rb") as f:
+        with open(current_path, "rb") as f:
             output_bytes = f.read()
         
         total_time = time.time() - start_time
+        output_mb = len(output_bytes) / 1024 / 1024
         
-        logger.info(f"[Modal HTTP] Output: {len(output_bytes) / 1024 / 1024:.2f} MB")
-        logger.info(f"[Modal HTTP] Time: {total_time:.2f}s")
+        stats["output_size_mb"] = round(output_mb, 2)
+        stats["processing_time_s"] = round(total_time, 2)
+        stats["method"] = f"modal-{mode}" + (f"+esrgan{upscale_factor}x" if stats["upscaled"] else "")
+        
+        logger.info(f"[Modal HTTP] ✅ Complete in {total_time:.1f}s")
+        logger.info(f"[Modal HTTP]   Output: {output_mb:.2f} MB, Method: {stats['method']}")
         
         return {
             "video_bytes": base64.b64encode(output_bytes).decode("utf-8"),
-            "stats": {
-                "mode": mode,
-                "platform": platform,
-                "input_size_mb": round(len(video_bytes) / 1024 / 1024, 2),
-                "output_size_mb": round(len(output_bytes) / 1024 / 1024, 2),
-                "frames_processed": result.get("frames_processed", 0),
-                "watermarks_detected": result.get("watermarks_detected", 0),
-                "processing_time_s": round(total_time, 2),
-            }
+            "stats": stats,
         }
+
+
+# NOTE: The main process_video_http endpoint handles both watermark removal AND upscaling
+# Just pass upscale=true and upscale_factor=2 or 4 in the request
 
 
 # Local testing

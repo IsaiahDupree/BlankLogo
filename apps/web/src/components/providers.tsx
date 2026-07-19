@@ -6,17 +6,20 @@ import ErrorBoundary from "./error-boundary";
 import { MetaPixelProvider } from "./meta-pixel-provider";
 import { AnalyticsProvider } from "./analytics-provider";
 import { CelebrationProvider } from "./credits-celebration";
+import { BehaviorTracker } from "./behavior-tracker";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ErrorBoundary>
       <Suspense fallback={null}>
         <AnalyticsProvider>
-          <MetaPixelProvider>
-            <ToastProvider>
-              <CelebrationProvider>{children}</CelebrationProvider>
-            </ToastProvider>
-          </MetaPixelProvider>
+          <BehaviorTracker>
+            <MetaPixelProvider>
+              <ToastProvider>
+                <CelebrationProvider>{children}</CelebrationProvider>
+              </ToastProvider>
+            </MetaPixelProvider>
+          </BehaviorTracker>
         </AnalyticsProvider>
       </Suspense>
     </ErrorBoundary>

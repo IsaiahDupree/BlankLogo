@@ -1,0 +1,22 @@
+{
+  "name": "blanklogo-ads",
+  "version": "1.0.0",
+  "description": "Remotion static ads for BlankLogo watermark removal",
+  "scripts": {
+    "start": "remotion studio",
+    "build": "remotion render src/index.ts BeforeAfterAd out/ad.mp4",
+    "render:all": "node scripts/render-all.js",
+    "render:static": "remotion still src/index.ts StaticAd out/static-ad.png --props='{\"variant\":\"sora\"}'",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
+}

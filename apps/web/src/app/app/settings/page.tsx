@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, Mail, Loader2, CheckCircle, Cloud } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
+import { settings as settingsEvents } from "@/lib/posthog-events";
 
 // Logging utility
 function logSettings(message: string, data?: unknown) {
@@ -41,6 +42,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     logSettings("⚙️ Settings page loaded");
+    settingsEvents.settingsViewed({ section: 'notifications' });
   }, []);
 
   const supabase = createBrowserClient(
@@ -188,7 +190,14 @@ export default function SettingsPage() {
 
   function togglePref(key: keyof NotificationPrefs) {
     logSettings("🔄 Toggling preference:", key);
-    setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
+    const newValue = !prefs[key];
+    setPrefs((prev) => ({ ...prev, [key]: newValue }));
+    
+    // Track the setting change
+    settingsEvents.notificationPrefChanged({
+      notification_type: key,
+      enabled: newValue,
+    });
   }
 
   if (loading) {

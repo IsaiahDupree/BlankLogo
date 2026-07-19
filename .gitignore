@@ -53,3 +53,9 @@ packages/remotion/out/
 .env.runpod
 .env.runpod
 .env.vercel.local
+
+# Sweep 2026-07-19 exclusions
+.env.vercel.pulled
+*.tsbuildinfo
+test-output/
+test-videos/
