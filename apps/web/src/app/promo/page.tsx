@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,7 +10,7 @@ import { trackCompleteRegistration, trackViewContent, trackLead } from "@/lib/me
 import { auth, error as phError } from "@/lib/posthog-events";
 import confetti from "canvas-confetti";
 
-export default function PromoPage() {
+function PromoPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -445,5 +446,13 @@ export default function PromoPage() {
         </button>
       </div>
     </main>
+  );
+}
+
+export default function PromoPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-gray-950 text-white" aria-busy="true" />}>
+      <PromoPageContent />
+    </Suspense>
   );
 }
