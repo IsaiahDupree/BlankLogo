@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { trackCompleteRegistration, trackViewContent, trackLead } from "@/lib/meta-pixel";
 import { auth, error as phError } from "@/lib/posthog-events";
+import { trackSignupSubmitted } from "@/lib/posthog";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -102,6 +103,7 @@ export default function SignupPage() {
     
     // Track CompleteRegistration for Meta Pixel
     trackCompleteRegistration({ contentName: 'BlankLogo Account', status: 'pending_confirmation' });
+    trackSignupSubmitted('signup');
     
     setSuccess(true);
     setLoading(false);

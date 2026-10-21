@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import InputsPanel from "./InputsPanel";
+import { trackDownloadClick } from "@/lib/posthog";
 
 type Project = {
   id: string;
@@ -368,6 +369,7 @@ export default function ProjectDetailPage() {
                 title="Final Video"
                 description="MP4 (1080p)"
                 href={downloads.video}
+                onClick={() => trackDownloadClick({ assetType: "final_video", placement: "project_detail" })}
               />
             )}
             {downloads?.captions && (
@@ -376,6 +378,7 @@ export default function ProjectDetailPage() {
                 title="Captions"
                 description="SRT format"
                 href={downloads.captions}
+                onClick={() => trackDownloadClick({ assetType: "captions", placement: "project_detail" })}
               />
             )}
             {downloads?.script && (
@@ -384,6 +387,7 @@ export default function ProjectDetailPage() {
                 title="Script"
                 description="Text file"
                 href={downloads.script}
+                onClick={() => trackDownloadClick({ assetType: "script", placement: "project_detail" })}
               />
             )}
             {downloads?.zip && (
@@ -392,6 +396,7 @@ export default function ProjectDetailPage() {
                 title="Asset Pack"
                 description="All project files"
                 href={downloads.zip}
+                onClick={() => trackDownloadClick({ assetType: "asset_pack", placement: "project_detail" })}
               />
             )}
           </div>
@@ -451,15 +456,18 @@ function DownloadCard({
   title,
   description,
   href,
+  onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   href: string;
+  onClick: () => void;
 }) {
   return (
     <a
       href={href}
+      onClick={onClick}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-brand-500/50 transition"

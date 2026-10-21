@@ -6,6 +6,7 @@ import { Upload, Link as LinkIcon, Loader2, Sparkles, Video, X, CheckCircle, Dow
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/toast";
 import { trackGenerateRequested, trackMediaReady, trackDownload } from "@/lib/meta-pixel";
+import { trackDownloadClick } from "@/lib/posthog";
 import { upload, job as phJob, error as phError, generateRequestId, ui, platform as platformEvents, video as videoEvents, form as formEvents } from "@/lib/posthog-events";
 
 // Logging utility
@@ -668,6 +669,11 @@ export default function RemoveWatermarkPage() {
                   onClick={() => {
                     // Track Download for Meta Pixel
                     if (jobId) trackDownload({ jobId, platform });
+                    trackDownloadClick({
+                      assetType: "processed_video",
+                      placement: "remove_result",
+                      platform,
+                    });
                   }}
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-green-600 hover:bg-green-500 transition font-medium"
                   data-testid="download-button"
