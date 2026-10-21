@@ -18,6 +18,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+import { trackDownloadClick } from "@/lib/posthog";
 
 interface JobDetail {
   id: string;
@@ -272,6 +273,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <a
                   href={job.output_url}
                   download={job.input_filename?.replace(/\.[^/.]+$/, "") + "_clean.mp4"}
+                  onClick={() => trackDownloadClick({ assetType: "processed_video", placement: "job_detail", platform: job.platform })}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 transition font-semibold text-white"
                 >
                   <Download className="w-5 h-5" />

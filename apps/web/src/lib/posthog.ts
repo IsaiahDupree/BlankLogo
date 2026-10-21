@@ -68,6 +68,26 @@ export function trackEvent(
   posthog.capture(eventName, properties);
 }
 
+export function trackDownloadClick(params: {
+  assetType: 'processed_video' | 'final_video' | 'captions' | 'script' | 'asset_pack';
+  placement: 'remove_result' | 'job_detail' | 'project_detail';
+  platform?: string;
+}): void {
+  trackEvent('download_clicked', {
+    asset_type: params.assetType,
+    placement: params.placement,
+    platform: params.platform,
+  });
+}
+
+export function trackSignupSubmitted(source: 'signup' | 'promo'): void {
+  trackEvent('signup_submitted', {
+    method: 'email',
+    source,
+    email_confirmation_required: true,
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // USER IDENTIFICATION
 // ═══════════════════════════════════════════════════════════════════

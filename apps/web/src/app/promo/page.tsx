@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, Eye, EyeOff, Gift, Sparkles, Zap } from "lucide-react";
 import { trackCompleteRegistration, trackViewContent, trackLead } from "@/lib/meta-pixel";
 import { auth, error as phError } from "@/lib/posthog-events";
+import { trackSignupSubmitted } from "@/lib/posthog";
 import confetti from "canvas-confetti";
 
 function PromoPageContent() {
@@ -125,6 +126,7 @@ function PromoPageContent() {
     }
 
     trackCompleteRegistration({ contentName: "BlankLogo Account (Promo)", status: "pending_confirmation", value: 10 });
+    trackSignupSubmitted('promo');
 
     // Big confetti burst on success
     confetti({
