@@ -61,6 +61,40 @@ export async function generateMetadata({ params }: { params: { platform: string 
   };
 }
 
+function structuredData(platform: (typeof PLATFORMS)[string], slug: string) {
+  const pageUrl = `https://www.blanklogo.app/remove/${slug}`;
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.blanklogo.app/#publisher",
+        name: "Dupree Ops LLC",
+        url: "https://dupreeops.com/",
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://www.blanklogo.app/#software",
+        name: "BlankLogo",
+        url: "https://www.blanklogo.app/",
+        applicationCategory: "MultimediaApplication",
+        operatingSystem: "Web",
+        publisher: { "@id": "https://www.blanklogo.app/#publisher" },
+      },
+      {
+        "@type": "WebPage",
+        "@id": `${pageUrl}#webpage`,
+        url: pageUrl,
+        name: `BlankLogo ${platform.name} Video Processing Guide`,
+        description: platformDescription(platform),
+        isPartOf: { "@id": "https://www.blanklogo.app/#software" },
+        about: { "@id": "https://www.blanklogo.app/#software" },
+        mainEntity: { "@id": "https://www.blanklogo.app/#software" },
+      },
+    ],
+  };
+}
+
 export default function PlatformPage({ params }: { params: { platform: string } }) {
   const platform = PLATFORMS[params.platform];
   
@@ -70,6 +104,12 @@ export default function PlatformPage({ params }: { params: { platform: string } 
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(structuredData(platform, params.platform)).replace(/</g, "\\u003c"),
+        }}
+      />
       {/* Header */}
       <header className="container mx-auto px-6 py-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
